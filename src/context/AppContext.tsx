@@ -129,48 +129,70 @@ interface AppContextType {
 
   // 1. User Management
   users: User[];
-  registerUser: (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string }) => User;
-  updateUser: (userId: string, updates: Partial<User>) => void;
-  deactivateUser: (userId: string) => void;
+  registerUser: (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string }) => Promise<User>;
+  updateUser: (userId: string, updates: Partial<User>) => Promise<void>;
+  deactivateUser: (userId: string) => Promise<void>;
 
   // 2. Branch Management
   branches: Branch[];
-  addBranch: (data: Omit<Branch, 'branchId'>) => Branch;
-  updateBranch: (branchId: string, updates: Partial<Branch>) => void;
-  deleteBranch: (branchId: string) => void;
+  addBranch: (data: Omit<Branch, 'branchId'>) => Promise<Branch>;
+  updateBranch: (branchId: string, updates: Partial<Branch>) => Promise<void>;
+  deleteBranch: (branchId: string) => Promise<void>;
 
   // 3. Items Management
   products: Product[];
-  addProduct: (data: Omit<Product, 'itemId' | 'isDiscontinued'>) => Product;
-  updateProduct: (itemId: string, updates: Partial<Product>) => void;
-  discontinueProduct: (itemId: string) => void;
+  addProduct: (data: Omit<Product, 'itemId' | 'isDiscontinued'>) => Promise<Product>;
+  updateProduct: (itemId: string, updates: Partial<Product>) => Promise<void>;
+  discontinueProduct: (itemId: string) => Promise<void>;
 
   // 4. Payment Management
   payments: Payment[];
-  createPayment: (orderId: string, amount: number, method: Payment['paymentMethod']) => Payment;
-  updatePaymentStatus: (transactionId: string, status: Payment['status']) => void;
-  refundPayment: (transactionId: string) => void;
+  createPayment: (orderId: string, amount: number, method: Payment['paymentMethod']) => Promise<Payment>;
+  updatePaymentStatus: (transactionId: string, status: Payment['status']) => Promise<void>;
+  refundPayment: (transactionId: string) => Promise<void>;
 
   // 5. Orders Management
   orders: Order[];
-  placeOrder: (deliveryAddress: Address | null) => Order;
-  updateOrderStatus: (orderId: string, status: Order['status']) => void;
-  cancelOrder: (orderId: string) => void;
+  placeOrder: (deliveryAddress: Address | null) => Promise<Order>;
+  updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
+  cancelOrder: (orderId: string) => Promise<void>;
 
   // 6. Promotions Management
   promotions: Promotion[];
-  addPromotion: (data: Omit<Promotion, 'promoId'>) => Promotion;
-  updatePromotion: (promoId: string, updates: Partial<Promotion>) => void;
-  deletePromotion: (promoId: string) => void;
+  addPromotion: (data: Omit<Promotion, 'promoId'>) => Promise<Promotion>;
+  updatePromotion: (promoId: string, updates: Partial<Promotion>) => Promise<void>;
+  deletePromotion: (promoId: string) => Promise<void>;
 
   // 7. Reviews & Feedback Management
   reviews: Review[];
-  addReview: (itemId: string, rating: number, comment: string) => Review;
-  updateReview: (reviewId: string, updates: Partial<Review>) => void;
-  deleteReview: (reviewId: string) => void;
+  addReview: (itemId: string, rating: number, comment: string) => Promise<Review>;
+  updateReview: (reviewId: string, updates: Partial<Review>) => Promise<void>;
+  deleteReview: (reviewId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+// --- API BASE CONFIG ---
+const API_BASE = 'http://localhost:8080/api';
+
+// Helper for calling API endpoints
+const apiRequest = async (path: string, options?: RequestInit) => {
+  const token = localStorage.getItem('fc_token');
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...options?.headers
+  };
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP Error ${res.status}`);
+  }
+  return res.json();
+};
 
 // --- SEED MOCK DATA ---
 
@@ -430,7 +452,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [currentRole, setCurrentRole] = useState<'CUSTOMER' | 'EMPLOYEE' | 'ADMIN'>(() => {
     const saved = localStorage.getItem('fc_current_role');
-    return saved ? JSON.parse(saved) as any : 'CUSTOMER';
+    return (saved === 'CUSTOMER' || saved === 'EMPLOYEE' || saved === 'ADMIN') ? saved : 'CUSTOMER';
   });
 
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(() => {
@@ -459,6 +481,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (selectedBranch) localStorage.setItem('fc_selected_branch', JSON.stringify(selectedBranch));
     else localStorage.removeItem('fc_selected_branch');
   }, [selectedBranch]);
+
+  // --- API ASYNC SYNC ON LOAD ---
+  useEffect(() => {
+    const loadData = async () => {
+      // Sync Branches
+      try {
+        const remoteBranches = await apiRequest('/branches');
+        if (remoteBranches && remoteBranches.length > 0) setBranches(remoteBranches);
+      } catch (e) {
+        console.warn("Backend API `/branches` down, using local branches configuration.", e);
+      }
+
+      // Sync Products Catalog
+      try {
+        const remoteProducts = await apiRequest('/items');
+        if (remoteProducts && remoteProducts.length > 0) setProducts(remoteProducts);
+      } catch (e) {
+        console.warn("Backend API `/items` down, using local product catalog.", e);
+      }
+
+      // Sync Active Promotions
+      try {
+        const remotePromos = await apiRequest('/promotions/active');
+        if (remotePromos && remotePromos.length > 0) setPromotions(remotePromos);
+      } catch (e) {
+        console.warn("Backend API `/promotions/active` down, using local promotion campaigns.", e);
+      }
+
+      // Sync Orders
+      try {
+        const remoteOrders = await apiRequest('/orders');
+        if (remoteOrders) setOrders(remoteOrders);
+      } catch (e) {
+        console.warn("Backend API `/orders` down, using local orders logs.", e);
+      }
+
+      // Sync Payments
+      try {
+        const remotePayments = await apiRequest('/payments/logs');
+        if (remotePayments) setPayments(remotePayments);
+      } catch (e) {
+        console.warn("Backend API `/payments/logs` down, using local transaction logs.", e);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Fetch reviews for loaded items
+  useEffect(() => {
+    const loadReviews = async () => {
+      if (products.length === 0) return;
+      try {
+        // Fetch reviews for the first product to verify API
+        const firstProdId = products[0].itemId;
+        const data = await apiRequest(`/reviews/item/${firstProdId}`);
+        if (data && data.reviews) {
+          // Merge remote reviews
+          setReviews(prev => {
+            const others = prev.filter(r => r.itemId !== firstProdId);
+            return [...others, ...data.reviews];
+          });
+        }
+      } catch (e) {
+        console.warn("Backend API `/reviews/item` down, using local feedback database.", e);
+      }
+    };
+    loadReviews();
+  }, [products]);
 
   // Handle Notifications
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -554,19 +645,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- 1. USER MANAGEMENT ---
 
-  const registerUser = (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string }) => {
-    const newUser: User = {
-      ...data,
-      userId: 'usr_' + Math.random().toString(36).substr(2, 9),
-      status: 'ACTIVE',
-      addresses: []
-    };
-    setUsers((prev) => [...prev, newUser]);
-    showNotification(`Account created for ${newUser.firstName}!`, 'success');
-    return newUser;
+  const registerUser = async (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string }) => {
+    try {
+      const response = await apiRequest('/users/register', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      setUsers((prev) => [...prev, response]);
+      showNotification(`Account created for ${response.firstName}!`, 'success');
+      return response;
+    } catch (e) {
+      console.warn("Backend API registration failed, falling back to local simulation:", e);
+      const newUser: User = {
+        ...data,
+        userId: 'usr_' + Math.random().toString(36).substr(2, 9),
+        status: 'ACTIVE',
+        addresses: []
+      };
+      setUsers((prev) => [...prev, newUser]);
+      showNotification(`[Simulation] Account created for ${newUser.firstName}!`, 'success');
+      return newUser;
+    }
   };
 
-  const updateUser = (userId: string, updates: Partial<User>) => {
+  const updateUser = async (userId: string, updates: Partial<User>) => {
+    try {
+      await apiRequest('/users/profile', {
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      });
+    } catch (e) {
+      console.warn("Backend API profile update failed, modifying local state only:", e);
+    }
     setUsers((prev) =>
       prev.map((u) => (u.userId === userId ? { ...u, ...updates } : u))
     );
@@ -576,7 +686,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification('Profile updated successfully', 'success');
   };
 
-  const deactivateUser = (userId: string) => {
+  const deactivateUser = async (userId: string) => {
+    try {
+      await apiRequest('/users/deactivate', { method: 'DELETE' });
+    } catch (e) {
+      console.warn("Backend API account deactivation failed, modifying local state only:", e);
+    }
     setUsers((prev) =>
       prev.map((u) => (u.userId === userId ? { ...u, status: 'INACTIVE' } : u))
     );
@@ -589,17 +704,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- 2. BRANCH MANAGEMENT ---
 
-  const addBranch = (data: Omit<Branch, 'branchId'>) => {
-    const newBranch: Branch = {
-      ...data,
-      branchId: 'br_' + Math.random().toString(36).substr(2, 9)
-    };
-    setBranches((prev) => [...prev, newBranch]);
-    showNotification(`Branch "${newBranch.name}" created!`, 'success');
-    return newBranch;
+  const addBranch = async (data: Omit<Branch, 'branchId'>) => {
+    try {
+      const response = await apiRequest('/branches', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      setBranches((prev) => [...prev, response]);
+      showNotification(`Branch "${response.name}" created!`, 'success');
+      return response;
+    } catch (e) {
+      console.warn("Backend API branch create failed, simulating locally:", e);
+      const newBranch: Branch = {
+        ...data,
+        branchId: 'br_' + Math.random().toString(36).substr(2, 9)
+      };
+      setBranches((prev) => [...prev, newBranch]);
+      showNotification(`[Simulation] Branch "${newBranch.name}" created!`, 'success');
+      return newBranch;
+    }
   };
 
-  const updateBranch = (branchId: string, updates: Partial<Branch>) => {
+  const updateBranch = async (branchId: string, updates: Partial<Branch>) => {
+    try {
+      await apiRequest(`/branches/${branchId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      });
+    } catch (e) {
+      console.warn("Backend API branch update failed, modifying local state only:", e);
+    }
     setBranches((prev) =>
       prev.map((b) => (b.branchId === branchId ? { ...b, ...updates } : b))
     );
@@ -609,8 +743,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification('Branch updated successfully', 'success');
   };
 
-  const deleteBranch = (branchId: string) => {
-    // Archive (soft delete)
+  const deleteBranch = async (branchId: string) => {
+    try {
+      await apiRequest(`/branches/${branchId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn("Backend API branch delete failed, modifying local state only:", e);
+    }
     setBranches((prev) =>
       prev.map((b) => (b.branchId === branchId ? { ...b, isActive: false } : b))
     );
@@ -619,65 +757,113 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- 3. ITEMS MANAGEMENT ---
 
-  const addProduct = (data: Omit<Product, 'itemId' | 'isDiscontinued'>) => {
-    const newProd: Product = {
-      ...data,
-      itemId: 'itm_' + Math.random().toString(36).substr(2, 9),
-      isDiscontinued: false
-    };
-    setProducts((prev) => [...prev, newProd]);
-    showNotification(`Product "${newProd.name}" added to catalog!`, 'success');
-    return newProd;
+  const addProduct = async (data: Omit<Product, 'itemId' | 'isDiscontinued'>) => {
+    try {
+      const response = await apiRequest('/items', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      setProducts((prev) => [...prev, response]);
+      showNotification(`Product "${response.name}" added to catalog!`, 'success');
+      return response;
+    } catch (e) {
+      console.warn("Backend API add product failed, simulating locally:", e);
+      const newProd: Product = {
+        ...data,
+        itemId: 'itm_' + Math.random().toString(36).substr(2, 9),
+        isDiscontinued: false
+      };
+      setProducts((prev) => [...prev, newProd]);
+      showNotification(`[Simulation] Product "${newProd.name}" added!`, 'success');
+      return newProd;
+    }
   };
 
-  const updateProduct = (itemId: string, updates: Partial<Product>) => {
+  const updateProduct = async (itemId: string, updates: Partial<Product>) => {
+    try {
+      await apiRequest(`/items/${itemId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      });
+    } catch (e) {
+      console.warn("Backend API update product failed, modifying local state only:", e);
+    }
     setProducts((prev) =>
       prev.map((p) => (p.itemId === itemId ? { ...p, ...updates } : p))
     );
     showNotification('Product details updated', 'success');
   };
 
-  const discontinueProduct = (itemId: string) => {
+  const discontinueProduct = async (itemId: string) => {
+    try {
+      await apiRequest(`/items/${itemId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn("Backend API discontinue product failed, modifying local state only:", e);
+    }
     setProducts((prev) =>
       prev.map((p) => (p.itemId === itemId ? { ...p, isDiscontinued: true } : p))
     );
-    // Remove from cart if discontinued
     setCart((prev) => prev.filter((item) => item.product.itemId !== itemId));
     showNotification('Product discontinued', 'info');
   };
 
   // --- 4. PAYMENT MANAGEMENT ---
 
-  const createPayment = (orderId: string, amount: number, method: Payment['paymentMethod']) => {
-    const newPayment: Payment = {
-      transactionId: 'tx_' + Math.random().toString(36).substr(2, 9),
-      orderId,
-      amount,
-      paymentMethod: method,
-      status: 'PENDING',
-      createdAt: new Date().toISOString()
-    };
-    setPayments((prev) => [newPayment, ...prev]);
-    return newPayment;
+  const createPayment = async (orderId: string, amount: number, method: Payment['paymentMethod']) => {
+    try {
+      const response = await apiRequest('/payments', {
+        method: 'POST',
+        body: JSON.stringify({ orderId, amount, paymentMethod: method })
+      });
+      setPayments((prev) => [response, ...prev]);
+      return response;
+    } catch (e) {
+      console.warn("Backend API create payment failed, simulating locally:", e);
+      const newPayment: Payment = {
+        transactionId: 'tx_' + Math.random().toString(36).substr(2, 9),
+        orderId,
+        amount,
+        paymentMethod: method,
+        status: 'PENDING',
+        createdAt: new Date().toISOString()
+      };
+      setPayments((prev) => [newPayment, ...prev]);
+      return newPayment;
+    }
   };
 
-  const updatePaymentStatus = (transactionId: string, status: Payment['status']) => {
+  const updatePaymentStatus = async (transactionId: string, status: Payment['status']) => {
+    try {
+      await apiRequest(`/payments/${transactionId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status })
+      });
+    } catch (e) {
+      console.warn("Backend API update payment status failed, modifying local state only:", e);
+    }
     setPayments((prev) =>
       prev.map((p) => (p.transactionId === transactionId ? { ...p, status } : p))
     );
     showNotification(`Payment status: ${status}`, status === 'COMPLETED' ? 'success' : 'error');
   };
 
-  const refundPayment = (transactionId: string) => {
+  const refundPayment = async (transactionId: string) => {
+    try {
+      await apiRequest(`/payments/${transactionId}/refund`, { method: 'POST' });
+    } catch (e) {
+      console.warn("Backend API refund failed, modifying local state only:", e);
+    }
+    
     setPayments((prev) =>
       prev.map((p) => (p.transactionId === transactionId ? { ...p, status: 'REFUNDED' } : p))
     );
+
     const paymentObj = payments.find((p) => p.transactionId === transactionId);
     if (paymentObj) {
       setOrders((prev) =>
         prev.map((o) => (o.orderId === paymentObj.orderId ? { ...o, status: 'CANCELLED' } : o))
       );
-      // Put stock back
+      // Restore stock levels locally
       const order = orders.find((o) => o.orderId === paymentObj.orderId);
       if (order) {
         setProducts((prevProds) =>
@@ -703,7 +889,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- 5. ORDERS MANAGEMENT ---
 
-  const placeOrder = (deliveryAddress: Address | null) => {
+  const placeOrder = async (deliveryAddress: Address | null) => {
     if (!currentUser) throw new Error('Must be logged in to place an order');
     if (!selectedBranch) throw new Error('Must select a branch');
     if (cart.length === 0) throw new Error('Cart is empty');
@@ -713,60 +899,108 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const deliveryFee = deliveryAddress ? 3.99 : 0;
     const total = Number((subtotal - discount + deliveryFee).toFixed(2));
 
-    const newOrder: Order = {
-      orderId: 'ord_' + Math.floor(100000 + Math.random() * 900000).toString(),
-      userId: currentUser.userId,
-      userName: `${currentUser.firstName} ${currentUser.lastName}`,
+    const orderPayload = {
       branchId: selectedBranch.branchId,
-      branchName: selectedBranch.name,
-      items: cart.map((i) => ({
-        itemId: i.product.itemId,
-        name: i.product.name,
-        price: i.product.price,
-        quantity: i.product.quantity
-      })),
-      subtotal: Number(subtotal.toFixed(2)),
-      discount: Number(discount.toFixed(2)),
-      deliveryFee,
-      total,
-      status: 'PROCESSING',
-      deliveryAddress,
-      createdAt: new Date().toISOString()
+      items: cart.map((i) => ({ itemId: i.product.itemId, quantity: i.quantity })),
+      couponCode: activeCoupon?.code || null,
+      deliveryAddressId: deliveryAddress?.id || null
     };
 
-    // Deduct stock
-    setProducts((prevProds) =>
-      prevProds.map((prod) => {
-        const cartItem = cart.find((i) => i.product.itemId === prod.itemId);
-        if (cartItem) {
-          const currentStock = prod.branchStock[selectedBranch.branchId] || 0;
-          return {
-            ...prod,
-            branchStock: {
-              ...prod.branchStock,
-              [selectedBranch.branchId]: Math.max(0, currentStock - cartItem.quantity)
-            }
-          };
-        }
-        return prod;
-      })
-    );
+    try {
+      const response = await apiRequest('/orders', {
+        method: 'POST',
+        body: JSON.stringify(orderPayload)
+      });
+      
+      // Update local product stocks based on successful placement
+      setProducts((prevProds) =>
+        prevProds.map((prod) => {
+          const cartItem = cart.find((i) => i.product.itemId === prod.itemId);
+          if (cartItem) {
+            const currentStock = prod.branchStock[selectedBranch.branchId] || 0;
+            return {
+              ...prod,
+              branchStock: {
+                ...prod.branchStock,
+                [selectedBranch.branchId]: Math.max(0, currentStock - cartItem.quantity)
+              }
+            };
+          }
+          return prod;
+        })
+      );
+      
+      setOrders((prev) => [response, ...prev]);
+      return response;
+    } catch (e) {
+      console.warn("Backend API place order failed, simulating locally:", e);
+      const newOrder: Order = {
+        orderId: 'ord_' + Math.floor(100000 + Math.random() * 900000).toString(),
+        userId: currentUser.userId,
+        userName: `${currentUser.firstName} ${currentUser.lastName}`,
+        branchId: selectedBranch.branchId,
+        branchName: selectedBranch.name,
+        items: cart.map((i) => ({
+          itemId: i.product.itemId,
+          name: i.product.name,
+          price: i.product.price,
+          quantity: i.quantity
+        })),
+        subtotal: Number(subtotal.toFixed(2)),
+        discount: Number(discount.toFixed(2)),
+        deliveryFee,
+        total,
+        status: 'PROCESSING',
+        deliveryAddress,
+        createdAt: new Date().toISOString()
+      };
 
-    // Save order
-    setOrders((prev) => [newOrder, ...prev]);
-    return newOrder;
+      setProducts((prevProds) =>
+        prevProds.map((prod) => {
+          const cartItem = cart.find((i) => i.product.itemId === prod.itemId);
+          if (cartItem) {
+            const currentStock = prod.branchStock[selectedBranch.branchId] || 0;
+            return {
+              ...prod,
+              branchStock: {
+                ...prod.branchStock,
+                [selectedBranch.branchId]: Math.max(0, currentStock - cartItem.quantity)
+              }
+            };
+          }
+          return prod;
+        })
+      );
+
+      setOrders((prev) => [newOrder, ...prev]);
+      return newOrder;
+    }
   };
 
-  const updateOrderStatus = (orderId: string, status: Order['status']) => {
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      await apiRequest(`/orders/${orderId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status })
+      });
+    } catch (e) {
+      console.warn("Backend API update status failed, modifying local state only:", e);
+    }
     setOrders((prev) =>
       prev.map((o) => (o.orderId === orderId ? { ...o, status } : o))
     );
     showNotification(`Order status updated to: ${status}`, 'info');
   };
 
-  const cancelOrder = (orderId: string) => {
+  const cancelOrder = async (orderId: string) => {
     const orderObj = orders.find((o) => o.orderId === orderId);
     if (!orderObj) return;
+
+    try {
+      await apiRequest(`/orders/${orderId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn("Backend API cancel order failed, modifying local state only:", e);
+    }
 
     setOrders((prev) =>
       prev.map((o) => (o.orderId === orderId ? { ...o, status: 'CANCELLED' } : o))
@@ -790,7 +1024,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
-    // If there is an associated payment, mark it as REFUNDED/CANCELLED
     const payment = payments.find((p) => p.orderId === orderId);
     if (payment) {
       setPayments((prev) =>
@@ -803,55 +1036,104 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- 6. PROMOTIONS MANAGEMENT ---
 
-  const addPromotion = (data: Omit<Promotion, 'promoId'>) => {
-    const newPromo: Promotion = {
-      ...data,
-      promoId: 'prm_' + Math.random().toString(36).substr(2, 9)
-    };
-    setPromotions((prev) => [...prev, newPromo]);
-    showNotification(`Promotion "${newPromo.code}" created!`, 'success');
-    return newPromo;
+  const addPromotion = async (data: Omit<Promotion, 'promoId'>) => {
+    try {
+      const response = await apiRequest('/promotions', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      setPromotions((prev) => [...prev, response]);
+      showNotification(`Promotion "${response.code}" created!`, 'success');
+      return response;
+    } catch (e) {
+      console.warn("Backend API promotions create failed, simulating locally:", e);
+      const newPromo: Promotion = {
+        ...data,
+        promoId: 'prm_' + Math.random().toString(36).substr(2, 9)
+      };
+      setPromotions((prev) => [...prev, newPromo]);
+      showNotification(`[Simulation] Promotion "${newPromo.code}" created!`, 'success');
+      return newPromo;
+    }
   };
 
-  const updatePromotion = (promoId: string, updates: Partial<Promotion>) => {
+  const updatePromotion = async (promoId: string, updates: Partial<Promotion>) => {
+    try {
+      await apiRequest(`/promotions/${promoId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      });
+    } catch (e) {
+      console.warn("Backend API update promo failed, modifying local state only:", e);
+    }
     setPromotions((prev) =>
       prev.map((p) => (p.promoId === promoId ? { ...p, ...updates } : p))
     );
     showNotification('Promotion details updated', 'success');
   };
 
-  const deletePromotion = (promoId: string) => {
+  const deletePromotion = async (promoId: string) => {
+    try {
+      await apiRequest(`/promotions/${promoId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn("Backend API delete promo failed, modifying local state only:", e);
+    }
     setPromotions((prev) => prev.filter((p) => p.promoId !== promoId));
     showNotification('Promotion deleted', 'info');
   };
 
   // --- 7. REVIEWS & FEEDBACK MANAGEMENT ---
 
-  const addReview = (itemId: string, rating: number, comment: string) => {
+  const addReview = async (itemId: string, rating: number, comment: string) => {
     if (!currentUser) throw new Error('Must be logged in to leave a review');
-    const newReview: Review = {
-      reviewId: 'rev_' + Math.random().toString(36).substr(2, 9),
-      itemId,
-      userId: currentUser.userId,
-      userName: `${currentUser.firstName} ${currentUser.lastName}`,
-      rating,
-      comment,
-      isFlagged: false,
-      createdAt: new Date().toISOString()
-    };
-    setReviews((prev) => [newReview, ...prev]);
-    showNotification('Review submitted successfully!', 'success');
-    return newReview;
+    
+    try {
+      const response = await apiRequest('/reviews', {
+        method: 'POST',
+        body: JSON.stringify({ itemId, rating, comment })
+      });
+      setReviews((prev) => [response, ...prev]);
+      showNotification('Review submitted successfully!', 'success');
+      return response;
+    } catch (e) {
+      console.warn("Backend API add review failed, simulating locally:", e);
+      const newReview: Review = {
+        reviewId: 'rev_' + Math.random().toString(36).substr(2, 9),
+        itemId,
+        userId: currentUser.userId,
+        userName: `${currentUser.firstName} ${currentUser.lastName}`,
+        rating,
+        comment,
+        isFlagged: false,
+        createdAt: new Date().toISOString()
+      };
+      setReviews((prev) => [newReview, ...prev]);
+      showNotification('Review submitted successfully (local simulation)!', 'success');
+      return newReview;
+    }
   };
 
-  const updateReview = (reviewId: string, updates: Partial<Review>) => {
+  const updateReview = async (reviewId: string, updates: Partial<Review>) => {
+    try {
+      await apiRequest(`/reviews/${reviewId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      });
+    } catch (e) {
+      console.warn("Backend API update review failed, modifying local state only:", e);
+    }
     setReviews((prev) =>
       prev.map((r) => (r.reviewId === reviewId ? { ...r, ...updates } : r))
     );
     showNotification('Review updated', 'success');
   };
 
-  const deleteReview = (reviewId: string) => {
+  const deleteReview = async (reviewId: string) => {
+    try {
+      await apiRequest(`/reviews/${reviewId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn("Backend API delete review failed, modifying local state only:", e);
+    }
     setReviews((prev) => prev.filter((r) => r.reviewId !== reviewId));
     showNotification('Review removed', 'info');
   };

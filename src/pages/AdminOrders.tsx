@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp, Order } from '../context/AppContext';
-import { ClipboardList, ArrowRight, XCircle, RefreshCw, DollarSign, Calendar, MapPin, PackageOpen } from 'lucide-react';
+import { ClipboardList, ArrowRight, XCircle, DollarSign, Calendar, MapPin, ShieldCheck } from 'lucide-react';
 
 export const AdminOrders: React.FC = () => {
   const {

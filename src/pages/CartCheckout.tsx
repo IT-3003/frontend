@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp, Address } from '../context/AppContext';
-import { Trash2, ShoppingBag, Plus, Minus, Tag, CreditCard, Receipt, Milestone, ShieldCheck } from 'lucide-react';
+import { Trash2, ShoppingBag, Plus, Minus, Tag, CreditCard, Milestone, ShieldCheck } from 'lucide-react';
 
 interface CartCheckoutProps {
   onNavigate: (page: string) => void;
@@ -102,23 +102,23 @@ export const CartCheckout: React.FC<CartCheckoutProps> = ({ onNavigate }) => {
 
     try {
       // 1. Create order
-      const order = placeOrder(deliveryAddress);
+      const order = await placeOrder(deliveryAddress);
       
       // 2. Create payment record
-      const payment = createPayment(order.orderId, total, paymentMethod);
+      const payment = await createPayment(order.orderId, total, paymentMethod);
       
       setCreatedOrder(order);
       setCreatedPayment(payment);
 
       // Simulate payment gateway delay
-      setTimeout(() => {
+      setTimeout(async () => {
         const paymentSuccess = paymentMethod !== 'DEBIT_CARD' || Math.random() > 0.15; // 85% success rate for simulation
         
         if (paymentSuccess) {
-          updatePaymentStatus(payment.transactionId, 'COMPLETED');
+          await updatePaymentStatus(payment.transactionId, 'COMPLETED');
           showNotification('Payment verified! Order placed successfully.', 'success');
         } else {
-          updatePaymentStatus(payment.transactionId, 'FAILED');
+          await updatePaymentStatus(payment.transactionId, 'FAILED');
           showNotification('Payment transaction failed. Please review your credentials.', 'error');
         }
         setIsProcessing(false);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { LayoutDashboard, Store, ClipboardList, CreditCard, Tag, MessageSquare, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Store, ClipboardList, Tag, MessageSquare, ShieldAlert } from 'lucide-react';
 
 interface SidebarProps {
   onNavigate: (page: string) => void;

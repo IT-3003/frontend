@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useApp, User } from '../context/AppContext';
-import { Users, UserPlus, ShoppingBag, ShieldCheck, DollarSign, Store, Trash2 } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { Users, UserPlus, ShoppingBag, DollarSign, Store } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const {

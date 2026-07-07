@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp, Review } from '../context/AppContext';
-import { MessageSquare, ShieldAlert, ShieldCheck, Trash2, Star, Edit3 } from 'lucide-react';
+import { MessageSquare, ShieldAlert, ShieldCheck, Trash2, Star } from 'lucide-react';
 
 export const AdminReviews: React.FC = () => {
   const { reviews, updateReview, deleteReview, products } = useApp();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useApp, Product, Review } from '../context/AppContext';
-import { Search, Star, ShoppingBag, ArrowLeft, Send, Check } from 'lucide-react';
+import { useApp, Product } from '../context/AppContext';
+import { Search, Star, ShoppingBag, ArrowLeft, Send } from 'lucide-react';
 
 interface ProductCatalogProps {
   initialSearch?: string;
@@ -153,7 +153,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                     <button 
                       className="btn btn-primary btn-icon" 
                       onClick={() => addToCart(prod)}
-                      disabled={selectedBranch && stock <= 0}
+                      disabled={!!(selectedBranch && stock <= 0)}
                       style={{ 
                         borderRadius: '8px',
                         opacity: selectedBranch && stock <= 0 ? 0.5 : 1,
@@ -216,7 +216,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                 <button 
                   className="btn btn-primary" 
                   onClick={() => addToCart(activeProduct)}
-                  disabled={selectedBranch && (activeProduct.branchStock[selectedBranch.branchId] || 0) <= 0}
+                  disabled={!!(selectedBranch && (activeProduct.branchStock[selectedBranch.branchId] || 0) <= 0)}
                   style={{ width: '100%', padding: '0.8rem', gap: '0.5rem' }}
                 >
                   <ShoppingBag size={18} /> Add to Shopping Cart

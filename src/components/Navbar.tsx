@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp, Branch, User } from '../context/AppContext';
+import { useApp } from '../context/AppContext';
 import { ShoppingCart, User as UserIcon, Store, LogOut, ChevronDown, ShieldAlert, Sparkles, Sun, Moon } from 'lucide-react';
 
 interface NavbarProps {
@@ -18,7 +18,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
     setCurrentRole,
     users,
     cart,
-    showNotification
+    showNotification,
+    registerUser
   } = useApp();
 
   const [showRoleSelect, setShowRoleSelect] = useState(false);
@@ -58,16 +59,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
         setCurrentUser(existing);
         setCurrentRole(existing.role);
       } else {
-        const newUser = {
+        registerUser({
           email,
           firstName,
           lastName,
           phone,
           role: 'CUSTOMER' as const
-        };
-        const registered = (window as any).appContextRegisterUser ? (window as any).appContextRegisterUser(newUser) : null;
-        // Since we are referencing registerUser from context:
-        // Let's use context registerUser directly
+        });
       }
       showNotification('Signed up successfully!', 'success');
       setIsRegister(false);

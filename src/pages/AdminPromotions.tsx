@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp, Promotion } from '../context/AppContext';
-import { Tag, Plus, Edit3, Trash2, Calendar, Store, Image } from 'lucide-react';
+import { Tag, Plus, Edit3, Trash2, Calendar, Store } from 'lucide-react';
 
 export const AdminPromotions: React.FC = () => {
   const { promotions, addPromotion, updatePromotion, deletePromotion, branches } = useApp();

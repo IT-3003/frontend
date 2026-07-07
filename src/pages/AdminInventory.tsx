@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp, Product } from '../context/AppContext';
-import { Plus, Edit3, Trash2, Clipboard, Layers } from 'lucide-react';
+import { Plus, Edit3, Trash2, Layers } from 'lucide-react';
 
 export const AdminInventory: React.FC = () => {
   const { products, addProduct, updateProduct, discontinueProduct, branches } = useApp();

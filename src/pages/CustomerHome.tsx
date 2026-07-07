@@ -196,7 +196,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({ onNavigate, onSelect
                     <button 
                       className="btn btn-primary btn-icon" 
                       onClick={() => addToCart(prod)}
-                      disabled={selectedBranch && stock <= 0}
+                      disabled={!!(selectedBranch && stock <= 0)}
                       style={{ 
                         borderRadius: '8px', 
                         padding: '0.5rem',

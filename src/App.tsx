@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AppProvider, useApp, Product } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -14,7 +14,7 @@ import { AdminPromotions } from './pages/AdminPromotions';
 import { AdminReviews } from './pages/AdminReviews';
 
 const AppContent: React.FC = () => {
-  const { currentRole, toast, showNotification } = useApp();
+  const { currentRole, toast } = useApp();
   const [activePage, setActivePage] = useState<string>('home');
   const [searchParam, setSearchParam] = useState<string>('');
   const [categoryParam, setCategoryParam] = useState<string>('');
