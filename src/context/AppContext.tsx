@@ -646,19 +646,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- 1. USER MANAGEMENT ---
 
   const registerUser = async (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string }) => {
+    const numericId = Math.floor(100000 + Math.random() * 900000);
+    const backendUserPayload = {
+      id: numericId,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      passwordHash: data.password || 'SecurePassword123!',
+      phoneNumber: data.phone || '',
+      role: data.role || 'CUSTOMER',
+      active: true,
+      type: data.role === 'ADMIN' ? 'admin' : (data.role === 'EMPLOYEE' ? 'staff' : 'customer')
+    };
+
     try {
-      const response = await apiRequest('/users/register', {
+      const response = await apiRequest('/user/create', {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: JSON.stringify(backendUserPayload)
       });
-      setUsers((prev) => [...prev, response]);
-      showNotification(`Account created for ${response.firstName}!`, 'success');
-      return response;
+      const mappedUser: User = {
+        userId: String(response.id),
+        email: response.email,
+        firstName: response.firstName,
+        lastName: response.lastName,
+        phone: response.phoneNumber || response.phone || '',
+        role: response.role,
+        status: response.active ? 'ACTIVE' : 'INACTIVE',
+        addresses: []
+      };
+      setUsers((prev) => [...prev, mappedUser]);
+      showNotification(`Account created for ${mappedUser.firstName}!`, 'success');
+      return mappedUser;
     } catch (e) {
       console.warn("Backend API registration failed, falling back to local simulation:", e);
       const newUser: User = {
         ...data,
-        userId: 'usr_' + Math.random().toString(36).substr(2, 9),
+        userId: 'usr_' + numericId,
         status: 'ACTIVE',
         addresses: []
       };
@@ -670,7 +693,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUser = async (userId: string, updates: Partial<User>) => {
     try {
-      await apiRequest('/users/profile', {
+      // Profile update endpoint is not implemented in backend, simulation only
+      await apiRequest('/user/profile', {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
@@ -688,7 +712,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deactivateUser = async (userId: string) => {
     try {
-      await apiRequest('/users/deactivate', { method: 'DELETE' });
+      const numericId = toNumericId(userId);
+      await apiRequest(`/user/${numericId}`, { method: 'DELETE' });
     } catch (e) {
       console.warn("Backend API account deactivation failed, modifying local state only:", e);
     }
@@ -705,19 +730,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- 2. BRANCH MANAGEMENT ---
 
   const addBranch = async (data: Omit<Branch, 'branchId'>) => {
+    const numericId = Math.floor(100000 + Math.random() * 900000);
+    const backendBranchPayload = {
+      branchId: numericId,
+      branchName: data.name,
+      address: data.address,
+      phoneNumber: '',
+      managerId: toNumericId(data.managerId),
+      openingHours: data.openingHours,
+      createdDate: new Date().toISOString(),
+      updatedDate: new Date().toISOString()
+    };
+
     try {
-      const response = await apiRequest('/branches', {
+      const response = await apiRequest('/branch/create', {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: JSON.stringify(backendBranchPayload)
       });
-      setBranches((prev) => [...prev, response]);
-      showNotification(`Branch "${response.name}" created!`, 'success');
-      return response;
+      const mappedBranch: Branch = {
+        branchId: String(response.branchId),
+        name: response.branchName,
+        address: response.address,
+        managerId: String(response.managerId),
+        managerName: data.managerName || '',
+        openingHours: response.openingHours,
+        isActive: true
+      };
+      setBranches((prev) => [...prev, mappedBranch]);
+      showNotification(`Branch "${mappedBranch.name}" created!`, 'success');
+      return mappedBranch;
     } catch (e) {
       console.warn("Backend API branch create failed, simulating locally:", e);
       const newBranch: Branch = {
         ...data,
-        branchId: 'br_' + Math.random().toString(36).substr(2, 9)
+        branchId: 'br_' + numericId
       };
       setBranches((prev) => [...prev, newBranch]);
       showNotification(`[Simulation] Branch "${newBranch.name}" created!`, 'success');
@@ -727,7 +773,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateBranch = async (branchId: string, updates: Partial<Branch>) => {
     try {
-      await apiRequest(`/branches/${branchId}`, {
+      // Branch update is not supported in the backend controller, simulation only
+      await apiRequest(`/branch/${toNumericId(branchId)}`, {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
@@ -745,7 +792,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteBranch = async (branchId: string) => {
     try {
-      await apiRequest(`/branches/${branchId}`, { method: 'DELETE' });
+      const numericId = toNumericId(branchId);
+      await apiRequest(`/branch/${numericId}`, { method: 'DELETE' });
     } catch (e) {
       console.warn("Backend API branch delete failed, modifying local state only:", e);
     }
@@ -758,19 +806,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- 3. ITEMS MANAGEMENT ---
 
   const addProduct = async (data: Omit<Product, 'itemId' | 'isDiscontinued'>) => {
+    const numericId = Math.floor(100000 + Math.random() * 900000);
+    const backendItemPayload = {
+      itemId: numericId,
+      itemName: data.name,
+      category: data.category,
+      baseprice: data.price
+    };
+
     try {
-      const response = await apiRequest('/items', {
+      const response = await apiRequest('/item/create', {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: JSON.stringify(backendItemPayload)
       });
-      setProducts((prev) => [...prev, response]);
-      showNotification(`Product "${response.name}" added to catalog!`, 'success');
-      return response;
+      const mappedProduct: Product = {
+        itemId: String(response.itemId),
+        name: response.itemName,
+        sku: data.sku || '',
+        category: response.category,
+        description: data.description || '',
+        price: response.baseprice,
+        imageUrl: data.imageUrl || '',
+        isDiscontinued: false,
+        branchStock: data.branchStock || {}
+      };
+      setProducts((prev) => [...prev, mappedProduct]);
+      showNotification(`Product "${mappedProduct.name}" added to catalog!`, 'success');
+      return mappedProduct;
     } catch (e) {
       console.warn("Backend API add product failed, simulating locally:", e);
       const newProd: Product = {
         ...data,
-        itemId: 'itm_' + Math.random().toString(36).substr(2, 9),
+        itemId: 'itm_' + numericId,
         isDiscontinued: false
       };
       setProducts((prev) => [...prev, newProd]);
@@ -780,10 +847,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateProduct = async (itemId: string, updates: Partial<Product>) => {
+    const numericId = toNumericId(itemId);
+    const backendItemPayload = {
+      itemId: numericId,
+      itemName: updates.name,
+      category: updates.category,
+      baseprice: updates.price
+    };
+
     try {
-      await apiRequest(`/items/${itemId}`, {
+      await apiRequest(`/item/${numericId}`, {
         method: 'PUT',
-        body: JSON.stringify(updates)
+        body: JSON.stringify(backendItemPayload)
       });
     } catch (e) {
       console.warn("Backend API update product failed, modifying local state only:", e);
@@ -796,7 +871,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const discontinueProduct = async (itemId: string) => {
     try {
-      await apiRequest(`/items/${itemId}`, { method: 'DELETE' });
+      const numericId = toNumericId(itemId);
+      await apiRequest(`/item/${numericId}`, { method: 'DELETE' });
     } catch (e) {
       console.warn("Backend API discontinue product failed, modifying local state only:", e);
     }
@@ -810,17 +886,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- 4. PAYMENT MANAGEMENT ---
 
   const createPayment = async (orderId: string, amount: number, method: Payment['paymentMethod']) => {
+    const numericPaymentId = Math.floor(100000 + Math.random() * 900000);
+    const backendPaymentPayload = {
+      paymentId: numericPaymentId,
+      orderId: toNumericId(orderId),
+      userId: currentUser ? toNumericId(currentUser.userId) : 1,
+      amount: amount,
+      paymentMethod: method,
+      transaction: 'tx_' + numericPaymentId,
+      paymentStatus: 'PENDING',
+      paymentDate: new Date().toISOString(),
+      isActive: true
+    };
+
     try {
-      const response = await apiRequest('/payments', {
+      const response = await apiRequest('/janindu/create', {
         method: 'POST',
-        body: JSON.stringify({ orderId, amount, paymentMethod: method })
+        body: JSON.stringify(backendPaymentPayload)
       });
-      setPayments((prev) => [response, ...prev]);
-      return response;
+      const mappedPayment: Payment = {
+        transactionId: response.transaction || String(response.paymentId),
+        orderId: String(response.orderId),
+        amount: response.amount,
+        paymentMethod: response.paymentMethod,
+        status: response.paymentStatus === 'COMPLETED' ? 'COMPLETED' : (response.paymentStatus === 'FAILED' ? 'FAILED' : 'PENDING'),
+        createdAt: response.paymentDate || new Date().toISOString()
+      };
+      setPayments((prev) => [mappedPayment, ...prev]);
+      return mappedPayment;
     } catch (e) {
       console.warn("Backend API create payment failed, simulating locally:", e);
       const newPayment: Payment = {
-        transactionId: 'tx_' + Math.random().toString(36).substr(2, 9),
+        transactionId: 'tx_' + numericPaymentId,
         orderId,
         amount,
         paymentMethod: method,
@@ -1034,22 +1131,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification('Order cancelled, inventory released', 'info');
   };
 
+
+
   // --- 6. PROMOTIONS MANAGEMENT ---
 
   const addPromotion = async (data: Omit<Promotion, 'promoId'>) => {
+    const numericPromoId = Math.floor(100000 + Math.random() * 900000);
+    const backendPromoPayload = {
+      promotionId: numericPromoId,
+      promotionName: data.code,
+      description: data.description,
+      discountValue: data.discountPercent,
+      discountType: data.type,
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: data.expiryDate ? data.expiryDate.split('T')[0] : new Date().toISOString().split('T')[0],
+      itemId: data.targetBranchId ? toNumericId(data.targetBranchId) : 0
+    };
+
     try {
-      const response = await apiRequest('/promotions', {
+      const response = await apiRequest('/promotion/create', {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: JSON.stringify(backendPromoPayload)
       });
-      setPromotions((prev) => [...prev, response]);
-      showNotification(`Promotion "${response.code}" created!`, 'success');
-      return response;
+      const mappedPromo: Promotion = {
+        promoId: String(response.promotionId),
+        code: response.promotionName,
+        discountPercent: response.discountValue,
+        description: response.description,
+        type: response.discountType === 'BANNER' ? 'BANNER' : 'COUPON',
+        bannerImageUrl: data.bannerImageUrl || '',
+        expiryDate: response.endDate ? new Date(response.endDate).toISOString() : new Date().toISOString(),
+        targetBranchId: response.itemId ? String(response.itemId) : null,
+        isActive: true
+      };
+      setPromotions((prev) => [...prev, mappedPromo]);
+      showNotification(`Promotion "${mappedPromo.code}" created!`, 'success');
+      return mappedPromo;
     } catch (e) {
       console.warn("Backend API promotions create failed, simulating locally:", e);
       const newPromo: Promotion = {
         ...data,
-        promoId: 'prm_' + Math.random().toString(36).substr(2, 9)
+        promoId: 'prm_' + numericPromoId
       };
       setPromotions((prev) => [...prev, newPromo]);
       showNotification(`[Simulation] Promotion "${newPromo.code}" created!`, 'success');
@@ -1059,7 +1181,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updatePromotion = async (promoId: string, updates: Partial<Promotion>) => {
     try {
-      await apiRequest(`/promotions/${promoId}`, {
+      await apiRequest(`/promotion/${toNumericId(promoId)}`, {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
@@ -1074,7 +1196,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deletePromotion = async (promoId: string) => {
     try {
-      await apiRequest(`/promotions/${promoId}`, { method: 'DELETE' });
+      await apiRequest(`/promotion/${toNumericId(promoId)}`, { method: 'DELETE' });
     } catch (e) {
       console.warn("Backend API delete promo failed, modifying local state only:", e);
     }
@@ -1102,7 +1224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const numericReviewId = Math.floor(100000 + Math.random() * 900000);
 
     try {
-      const response = await apiRequest('/reviewsandfeedback/create', {
+      const response = await apiRequest('/reviews/create', {
         method: 'POST',
         body: JSON.stringify({
           reviewId: numericReviewId,
@@ -1145,7 +1267,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateReview = async (reviewId: string, updates: Partial<Review>) => {
     try {
-      await apiRequest(`/reviews/${reviewId}`, {
+      await apiRequest(`/reviews/${toNumericId(reviewId)}`, {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
@@ -1160,7 +1282,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteReview = async (reviewId: string) => {
     try {
-      await apiRequest(`/reviews/${reviewId}`, { method: 'DELETE' });
+      const numericId = toNumericId(reviewId);
+      await apiRequest(`/reviews/${numericId}`, { method: 'DELETE' });
     } catch (e) {
       console.warn("Backend API delete review failed, modifying local state only:", e);
     }
