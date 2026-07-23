@@ -24,7 +24,11 @@ export const ApiPlayground: React.FC = () => {
     createPayment,
     addPromotion,
     addReview,
-    deleteReview
+    deleteReview,
+    getUserById,
+    getBranchById,
+    getItemById,
+    getReviewById
   } = useApp();
 
   const [logs, setLogs] = useState<ApiLog[]>([]);
@@ -253,6 +257,60 @@ export const ApiPlayground: React.FC = () => {
     }
   };
 
+  // GET endpoints test states & handlers
+  const [queryUserId, setQueryUserId] = useState('');
+  const [queryBranchId, setQueryBranchId] = useState('');
+  const [queryItemId, setQueryItemId] = useState('');
+  const [queryReviewId, setQueryReviewId] = useState('');
+
+  const handleGetUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!queryUserId) return;
+    const logId = addLog('GET', `/api/user/${queryUserId}`);
+    try {
+      const res = await getUserById(queryUserId);
+      updateLogSuccess(logId, res);
+    } catch (err: any) {
+      updateLogError(logId, err.message || String(err));
+    }
+  };
+
+  const handleGetBranch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!queryBranchId) return;
+    const logId = addLog('GET', `/api/branch/${queryBranchId}`);
+    try {
+      const res = await getBranchById(queryBranchId);
+      updateLogSuccess(logId, res);
+    } catch (err: any) {
+      updateLogError(logId, err.message || String(err));
+    }
+  };
+
+  const handleGetItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!queryItemId) return;
+    const logId = addLog('GET', `/api/item/${queryItemId}`);
+    try {
+      const res = await getItemById(queryItemId);
+      updateLogSuccess(logId, res);
+    } catch (err: any) {
+      updateLogError(logId, err.message || String(err));
+    }
+  };
+
+  const handleGetReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!queryReviewId) return;
+    const logId = addLog('GET', `/api/reviews/${queryReviewId}`);
+    try {
+      const res = await getReviewById(queryReviewId);
+      updateLogSuccess(logId, res);
+    } catch (err: any) {
+      updateLogError(logId, err.message || String(err));
+    }
+  };
+
   return (
     <div className="main-content" style={{ padding: '2rem 1rem', maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ marginBottom: '2rem' }}>
@@ -344,6 +402,17 @@ export const ApiPlayground: React.FC = () => {
                     <Trash2 size={16} /> Deactivate User
                   </button>
                 </form>
+
+                <form onSubmit={handleGetUser} style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', marginTop: '2rem' }}>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Get User by ID (GET /api/user/&#123;id&#125;)</h4>
+                  <div className="form-group">
+                    <label className="form-label">User ID (Numeric)</label>
+                    <input type="text" className="form-input" placeholder="e.g. 104857" value={queryUserId} onChange={(e) => setQueryUserId(e.target.value)} required />
+                  </div>
+                  <button type="submit" className="btn btn-secondary" style={{ gap: '0.5rem' }}>
+                    <Send size={16} /> Fetch User Data
+                  </button>
+                </form>
               </div>
             )}
 
@@ -386,6 +455,17 @@ export const ApiPlayground: React.FC = () => {
                   </div>
                   <button type="submit" className="btn btn-danger" style={{ gap: '0.5rem' }}>
                     <Trash2 size={16} /> Delete Branch
+                  </button>
+                </form>
+
+                <form onSubmit={handleGetBranch} style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', marginTop: '2rem' }}>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Get Branch by ID (GET /api/branch/&#123;id&#125;)</h4>
+                  <div className="form-group">
+                    <label className="form-label">Branch ID (Numeric)</label>
+                    <input type="text" className="form-input" placeholder="e.g. 500123" value={queryBranchId} onChange={(e) => setQueryBranchId(e.target.value)} required />
+                  </div>
+                  <button type="submit" className="btn btn-secondary" style={{ gap: '0.5rem' }}>
+                    <Send size={16} /> Fetch Branch Data
                   </button>
                 </form>
               </div>
@@ -447,6 +527,17 @@ export const ApiPlayground: React.FC = () => {
                   </div>
                   <button type="submit" className="btn btn-danger" style={{ gap: '0.5rem' }}>
                     <Trash2 size={16} /> Discontinue Product
+                  </button>
+                </form>
+
+                <form onSubmit={handleGetItem} style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', marginTop: '2rem' }}>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Get Item by ID (GET /api/item/&#123;id&#125;)</h4>
+                  <div className="form-group">
+                    <label className="form-label">Item ID (Numeric)</label>
+                    <input type="text" className="form-input" placeholder="e.g. 20015" value={queryItemId} onChange={(e) => setQueryItemId(e.target.value)} required />
+                  </div>
+                  <button type="submit" className="btn btn-secondary" style={{ gap: '0.5rem' }}>
+                    <Send size={16} /> Fetch Item Data
                   </button>
                 </form>
               </div>
@@ -555,6 +646,17 @@ export const ApiPlayground: React.FC = () => {
                   </div>
                   <button type="submit" className="btn btn-danger" style={{ gap: '0.5rem' }}>
                     <Trash2 size={16} /> Delete Review
+                  </button>
+                </form>
+
+                <form onSubmit={handleGetReview} style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', marginTop: '2rem' }}>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Get Review by ID (GET /api/reviews/&#123;id&#125;)</h4>
+                  <div className="form-group">
+                    <label className="form-label">Review ID (Numeric)</label>
+                    <input type="text" className="form-input" placeholder="e.g. 98124" value={queryReviewId} onChange={(e) => setQueryReviewId(e.target.value)} required />
+                  </div>
+                  <button type="submit" className="btn btn-secondary" style={{ gap: '0.5rem' }}>
+                    <Send size={16} /> Fetch Review Data
                   </button>
                 </form>
               </div>

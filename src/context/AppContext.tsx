@@ -168,6 +168,12 @@ interface AppContextType {
   addReview: (itemId: string, rating: number, comment: string) => Promise<Review>;
   updateReview: (reviewId: string, updates: Partial<Review>) => Promise<void>;
   deleteReview: (reviewId: string) => Promise<void>;
+
+  // 8. GET endpoints mapping
+  getUserById: (id: string) => Promise<User>;
+  getBranchById: (id: string) => Promise<Branch>;
+  getItemById: (id: string) => Promise<Product>;
+  getReviewById: (id: string) => Promise<Review>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -504,7 +510,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     const branchStock = product.branchStock[selectedBranch.branchId] || 0;
-    
+
     setCart((prev) => {
       const existing = prev.find((item) => item.product.itemId === product.itemId);
       const currentQty = existing ? existing.quantity : 0;
@@ -515,7 +521,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return prev;
       }
       showNotification(`${product.name} added to cart`, 'success');
-      
+
       if (existing) {
         return prev.map((item) =>
           item.product.itemId === product.itemId ? { ...item, quantity: targetQty } : item
@@ -568,7 +574,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showNotification('This coupon is not valid at your selected store branch', 'error');
       return null;
     }
-    
+
     // Check if expired
     if (new Date(promo.expiryDate) < new Date()) {
       showNotification('This coupon has expired', 'error');
@@ -887,7 +893,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn("Backend API refund failed, modifying local state only:", e);
     }
-    
+
     setPayments((prev) =>
       prev.map((p) => (p.transactionId === transactionId ? { ...p, status: 'REFUNDED' } : p))
     );
@@ -945,7 +951,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify(orderPayload)
       });
-      
+
       // Update local product stocks based on successful placement
       setProducts((prevProds) =>
         prevProds.map((prod) => {
@@ -963,7 +969,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return prod;
         })
       );
-      
+
       setOrders((prev) => [response, ...prev]);
       return response;
     } catch (e) {
@@ -1155,7 +1161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addReview = async (itemId: string, rating: number, comment: string) => {
     if (!currentUser) throw new Error('Must be logged in to leave a review');
-    
+
     const numericUserId = toNumericId(currentUser.userId);
     const numericItemId = toNumericId(itemId);
     const numericReviewId = Math.floor(100000 + Math.random() * 900000);
@@ -1228,6 +1234,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification('Review removed', 'info');
   };
 
+  const getUserById = async (id: string): Promise<User> => {
+    const numericId = toNumericId(id);
+    const response = await apiRequest(`/user/${numericId}`);
+    return {
+      userId: String(response.id),
+      email: response.email,
+      firstName: response.firstName,
+      lastName: response.lastName,
+      phone: response.phoneNumber || '',
+      role: response.role,
+      status: response.active ? 'ACTIVE' : 'INACTIVE',
+      addresses: []
+    };
+  };
+
+  const getBranchById = async (id: string): Promise<Branch> => {
+    const numericId = toNumericId(id);
+    const response = await apiRequest(`/branch/${numericId}`);
+    return {
+      branchId: String(response.branchId),
+      name: response.branchName,
+      address: response.address,
+      managerId: String(response.managerId),
+      managerName: '',
+      openingHours: response.openingHours,
+      isActive: true
+    };
+  };
+
+  const getItemById = async (id: string): Promise<Product> => {
+    const numericId = toNumericId(id);
+    const response = await apiRequest(`/item/${numericId}`);
+    return {
+      itemId: String(response.itemId),
+      name: response.itemName,
+      sku: '',
+      category: response.category,
+      description: '',
+      price: response.baseprice,
+      imageUrl: '',
+      isDiscontinued: false,
+      branchStock: {}
+    };
+  };
+
+  const getReviewById = async (id: string): Promise<Review> => {
+    const numericId = toNumericId(id);
+    const response = await apiRequest(`/reviews/${numericId}`);
+    return {
+      reviewId: String(response.reviewId),
+      itemId: String(response.itemId),
+      userId: String(response.userId),
+      userName: '',
+      rating: response.rating,
+      comment: response.comment,
+      isFlagged: false,
+      createdAt: new Date().toISOString()
+    };
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1273,7 +1339,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reviews,
         addReview,
         updateReview,
-        deleteReview
+        deleteReview,
+        getUserById,
+        getBranchById,
+        getItemById,
+        getReviewById
       }}
     >
       {children}
