@@ -179,7 +179,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // --- API BASE CONFIG ---
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = '/api';
 
 // Helper for calling API endpoints
 const apiRequest = async (path: string, options?: RequestInit) => {
@@ -597,7 +597,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email: data.email,
       passwordHash: data.password || 'SecurePassword123!',
       phoneNumber: data.phone || '',
-      role: data.role || 'CUSTOMER',
+      role: data.role === 'EMPLOYEE' ? 'STAFF' : data.role,
       active: true,
       type: data.role === 'ADMIN' ? 'admin' : (data.role === 'EMPLOYEE' ? 'staff' : 'customer')
     };
@@ -613,7 +613,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         firstName: response.firstName,
         lastName: response.lastName,
         phone: response.phoneNumber || response.phone || '',
-        role: response.role,
+        role: response.role === 'STAFF' ? 'EMPLOYEE' : response.role,
         status: response.active ? 'ACTIVE' : 'INACTIVE',
         addresses: []
       };
@@ -830,12 +830,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const createPayment = async (orderId: string, amount: number, method: Payment['paymentMethod']) => {
     const numericPaymentId = Math.floor(100000 + Math.random() * 900000);
+    
+    let backendMethod = 'CARD';
+    if (method === 'CASH_ON_DELIVERY') backendMethod = 'CASH';
+    else if (method === 'MOBILE_WALLET') backendMethod = 'ONLINE';
+
     const backendPaymentPayload = {
       paymentId: numericPaymentId,
       orderId: toNumericId(orderId),
       userId: currentUser ? toNumericId(currentUser.userId) : 1,
       amount: amount,
-      paymentMethod: method,
+      paymentMethod: backendMethod,
       transaction: 'tx_' + numericPaymentId,
       paymentStatus: 'PENDING',
       paymentDate: new Date().toISOString(),
@@ -847,12 +852,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify(backendPaymentPayload)
       });
+
+      let frontendMethod: Payment['paymentMethod'] = 'CREDIT_CARD';
+      if (response.paymentMethod === 'CASH') frontendMethod = 'CASH_ON_DELIVERY';
+      else if (response.paymentMethod === 'ONLINE') frontendMethod = 'MOBILE_WALLET';
+
+      let frontendStatus: Payment['status'] = 'PENDING';
+      if (response.paymentStatus === 'SUCCESS') frontendStatus = 'COMPLETED';
+      else if (response.paymentStatus === 'FAILED') frontendStatus = 'FAILED';
+
       const mappedPayment: Payment = {
         transactionId: response.transaction || String(response.paymentId),
         orderId: String(response.orderId),
         amount: response.amount,
-        paymentMethod: response.paymentMethod,
-        status: response.paymentStatus === 'COMPLETED' ? 'COMPLETED' : (response.paymentStatus === 'FAILED' ? 'FAILED' : 'PENDING'),
+        paymentMethod: frontendMethod,
+        status: frontendStatus,
         createdAt: response.paymentDate || new Date().toISOString()
       };
       setPayments((prev) => [mappedPayment, ...prev]);
@@ -1243,7 +1257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       firstName: response.firstName,
       lastName: response.lastName,
       phone: response.phoneNumber || '',
-      role: response.role,
+      role: response.role === 'STAFF' ? 'EMPLOYEE' : response.role,
       status: response.active ? 'ACTIVE' : 'INACTIVE',
       addresses: []
     };
