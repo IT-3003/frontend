@@ -1084,17 +1084,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- 7. REVIEWS & FEEDBACK MANAGEMENT ---
 
+  const toNumericId = (id: string): number => {
+    const num = parseInt(id.replace(/\D/g, ''), 10);
+    if (!isNaN(num)) return num;
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash) % 1000000;
+  };
+
   const addReview = async (itemId: string, rating: number, comment: string) => {
     if (!currentUser) throw new Error('Must be logged in to leave a review');
     
+    const numericUserId = toNumericId(currentUser.userId);
+    const numericItemId = toNumericId(itemId);
+    const numericReviewId = Math.floor(100000 + Math.random() * 900000);
+
     try {
-      const response = await apiRequest('/reviews', {
+      const response = await apiRequest('/reviewsandfeedback/create', {
         method: 'POST',
-        body: JSON.stringify({ itemId, rating, comment })
+        body: JSON.stringify({
+          reviewId: numericReviewId,
+          userId: numericUserId,
+          itemId: numericItemId,
+          rating,
+          comment
+        })
       });
-      setReviews((prev) => [response, ...prev]);
+      const mappedResponse: Review = {
+        reviewId: String(response.reviewId),
+        itemId: itemId,
+        userId: currentUser.userId,
+        userName: `${currentUser.firstName} ${currentUser.lastName}`,
+        rating: response.rating,
+        comment: response.comment,
+        isFlagged: false,
+        createdAt: new Date().toISOString()
+      };
+      setReviews((prev) => [mappedResponse, ...prev]);
       showNotification('Review submitted successfully!', 'success');
-      return response;
+      return mappedResponse;
     } catch (e) {
       console.warn("Backend API add review failed, simulating locally:", e);
       const newReview: Review = {
