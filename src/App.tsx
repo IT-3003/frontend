@@ -12,10 +12,11 @@ import { AdminInventory } from './pages/AdminInventory';
 import { AdminOrders } from './pages/AdminOrders';
 import { AdminPromotions } from './pages/AdminPromotions';
 import { AdminReviews } from './pages/AdminReviews';
+import { ApiPlayground } from './pages/ApiPlayground';
 
 const AppContent: React.FC = () => {
   const { currentRole, toast } = useApp();
-  const [activePage, setActivePage] = useState<string>('home');
+  const [activePage, setActivePage] = useState<string>('playground');
   const [searchParam, setSearchParam] = useState<string>('');
   const [categoryParam, setCategoryParam] = useState<string>('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -47,6 +48,10 @@ const AppContent: React.FC = () => {
 
   const renderPage = () => {
     switch (activePage) {
+      // API Playground View
+      case 'playground':
+        return <ApiPlayground />;
+
       // Customer Views
       case 'home':
         return <CustomerHome onNavigate={navigate} onSelectProduct={handleSelectProduct} />;
@@ -79,7 +84,7 @@ const AppContent: React.FC = () => {
         return <AdminReviews />;
 
       default:
-        return <CustomerHome onNavigate={navigate} onSelectProduct={handleSelectProduct} />;
+        return <ApiPlayground />;
     }
   };
 

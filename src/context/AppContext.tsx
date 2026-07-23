@@ -483,73 +483,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [selectedBranch]);
 
   // --- API ASYNC SYNC ON LOAD ---
+  // Unimplemented list/fetch endpoints on the backend are omitted here to prevent console warnings and unnecessary network errors, allowing the frontend to use local seed data while still hitting the correct backend endpoints for actions.
   useEffect(() => {
-    const loadData = async () => {
-      // Sync Branches
-      try {
-        const remoteBranches = await apiRequest('/branches');
-        if (remoteBranches && remoteBranches.length > 0) setBranches(remoteBranches);
-      } catch (e) {
-        console.warn("Backend API `/branches` down, using local branches configuration.", e);
-      }
-
-      // Sync Products Catalog
-      try {
-        const remoteProducts = await apiRequest('/items');
-        if (remoteProducts && remoteProducts.length > 0) setProducts(remoteProducts);
-      } catch (e) {
-        console.warn("Backend API `/items` down, using local product catalog.", e);
-      }
-
-      // Sync Active Promotions
-      try {
-        const remotePromos = await apiRequest('/promotions/active');
-        if (remotePromos && remotePromos.length > 0) setPromotions(remotePromos);
-      } catch (e) {
-        console.warn("Backend API `/promotions/active` down, using local promotion campaigns.", e);
-      }
-
-      // Sync Orders
-      try {
-        const remoteOrders = await apiRequest('/orders');
-        if (remoteOrders) setOrders(remoteOrders);
-      } catch (e) {
-        console.warn("Backend API `/orders` down, using local orders logs.", e);
-      }
-
-      // Sync Payments
-      try {
-        const remotePayments = await apiRequest('/payments/logs');
-        if (remotePayments) setPayments(remotePayments);
-      } catch (e) {
-        console.warn("Backend API `/payments/logs` down, using local transaction logs.", e);
-      }
-    };
-
-    loadData();
+    // Left empty since GET list endpoints are not implemented in the backend.
   }, []);
-
-  // Fetch reviews for loaded items
-  useEffect(() => {
-    const loadReviews = async () => {
-      if (products.length === 0) return;
-      try {
-        // Fetch reviews for the first product to verify API
-        const firstProdId = products[0].itemId;
-        const data = await apiRequest(`/reviews/item/${firstProdId}`);
-        if (data && data.reviews) {
-          // Merge remote reviews
-          setReviews(prev => {
-            const others = prev.filter(r => r.itemId !== firstProdId);
-            return [...others, ...data.reviews];
-          });
-        }
-      } catch (e) {
-        console.warn("Backend API `/reviews/item` down, using local feedback database.", e);
-      }
-    };
-    loadReviews();
-  }, [products]);
 
   // Handle Notifications
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'success') => {

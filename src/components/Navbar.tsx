@@ -161,6 +161,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
             )}
           </div>
 
+          {/* API Playground Link */}
+          <button 
+            className="btn" 
+            onClick={() => onNavigate('playground')} 
+            style={{ 
+              background: 'transparent', 
+              color: activePage === 'playground' ? 'var(--color-accent)' : 'var(--text-primary)', 
+              fontWeight: activePage === 'playground' ? 'bold' : 'normal' 
+            }}
+          >
+            API Playground
+          </button>
+
           {/* Customer Specific Links */}
           {currentRole === 'CUSTOMER' && (
             <>
