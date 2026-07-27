@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Send, Trash2, Edit3, ShieldAlert, Store, ShoppingBag, CreditCard, Tag, MessageSquare, List } from 'lucide-react';
+import { Send, Trash2, Edit3, ShieldAlert, Store, ShoppingBag, CreditCard, Tag, MessageSquare, List, Database } from 'lucide-react';
 
 interface ApiLog {
   id: string;
@@ -28,11 +28,193 @@ export const ApiPlayground: React.FC = () => {
     getUserById,
     getBranchById,
     getItemById,
-    getReviewById
+    getReviewById,
+    users,
+    branches,
+    products,
+    promotions,
+    reviews,
+    payments,
+    orders
   } = useApp();
 
   const [logs, setLogs] = useState<ApiLog[]>([]);
-  const [activeTab, setActiveTab] = useState<'user' | 'branch' | 'item' | 'payment' | 'promotion' | 'review'>('user');
+  const [activeTab, setActiveTab] = useState<'user' | 'branch' | 'item' | 'payment' | 'promotion' | 'review' | 'db'>('user');
+
+  // DB Viewer state
+  const [dbTables, setDbTables] = useState<string[]>([]);
+  const [selectedTable, setSelectedTable] = useState<string>('');
+  const [tableData, setTableData] = useState<{ columns: { column_name: string; data_type: string }[]; rows: any[] } | null>(null);
+  const [loadingTables, setLoadingTables] = useState(false);
+  const [loadingTableData, setLoadingTableData] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const [isSimulated, setIsSimulated] = useState(false);
+
+  // Fetch tables list
+  const fetchTables = async () => {
+    setLoadingTables(true);
+    setDbError(null);
+    setIsSimulated(false);
+    try {
+      const res = await fetch('/api/db/tables');
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      setDbTables(data || []);
+      if (data && data.length > 0 && !selectedTable) {
+        setSelectedTable(data[0]);
+      }
+    } catch (err: any) {
+      console.warn("Database API tables fetch failed, falling back to simulated sandbox tables:", err);
+      setIsSimulated(true);
+      const simulatedTables = ['users', 'branches', 'products', 'promotions', 'reviews', 'payments', 'orders'];
+      setDbTables(simulatedTables);
+      if (!selectedTable) {
+        setSelectedTable(simulatedTables[0]);
+      }
+    } finally {
+      setLoadingTables(false);
+    }
+  };
+
+  // Fetch specific table content
+  const fetchTableData = async (tableName: string) => {
+    setLoadingTableData(true);
+    setDbError(null);
+    
+    if (isSimulated) {
+      // Return simulated metadata and rows
+      try {
+        let cols: { column_name: string; data_type: string }[] = [];
+        let rowsData: any[] = [];
+        
+        switch (tableName) {
+          case 'users':
+            cols = [
+              { column_name: 'userId', data_type: 'VARCHAR' },
+              { column_name: 'email', data_type: 'VARCHAR' },
+              { column_name: 'firstName', data_type: 'VARCHAR' },
+              { column_name: 'lastName', data_type: 'VARCHAR' },
+              { column_name: 'phone', data_type: 'VARCHAR' },
+              { column_name: 'role', data_type: 'VARCHAR' },
+              { column_name: 'status', data_type: 'VARCHAR' }
+            ];
+            rowsData = users;
+            break;
+          case 'branches':
+            cols = [
+              { column_name: 'branchId', data_type: 'VARCHAR' },
+              { column_name: 'name', data_type: 'VARCHAR' },
+              { column_name: 'address', data_type: 'VARCHAR' },
+              { column_name: 'managerId', data_type: 'VARCHAR' },
+              { column_name: 'managerName', data_type: 'VARCHAR' },
+              { column_name: 'openingHours', data_type: 'VARCHAR' },
+              { column_name: 'isActive', data_type: 'BOOLEAN' }
+            ];
+            rowsData = branches;
+            break;
+          case 'products':
+            cols = [
+              { column_name: 'itemId', data_type: 'VARCHAR' },
+              { column_name: 'name', data_type: 'VARCHAR' },
+              { column_name: 'sku', data_type: 'VARCHAR' },
+              { column_name: 'category', data_type: 'VARCHAR' },
+              { column_name: 'description', data_type: 'VARCHAR' },
+              { column_name: 'price', data_type: 'NUMERIC' },
+              { column_name: 'imageUrl', data_type: 'VARCHAR' },
+              { column_name: 'isDiscontinued', data_type: 'BOOLEAN' }
+            ];
+            rowsData = products;
+            break;
+          case 'promotions':
+            cols = [
+              { column_name: 'promoId', data_type: 'VARCHAR' },
+              { column_name: 'code', data_type: 'VARCHAR' },
+              { column_name: 'discountPercent', data_type: 'INTEGER' },
+              { column_name: 'description', data_type: 'VARCHAR' },
+              { column_name: 'type', data_type: 'VARCHAR' },
+              { column_name: 'bannerImageUrl', data_type: 'VARCHAR' },
+              { column_name: 'expiryDate', data_type: 'TIMESTAMP' },
+              { column_name: 'targetBranchId', data_type: 'VARCHAR' },
+              { column_name: 'isActive', data_type: 'BOOLEAN' }
+            ];
+            rowsData = promotions;
+            break;
+          case 'reviews':
+            cols = [
+              { column_name: 'reviewId', data_type: 'VARCHAR' },
+              { column_name: 'itemId', data_type: 'VARCHAR' },
+              { column_name: 'userId', data_type: 'VARCHAR' },
+              { column_name: 'userName', data_type: 'VARCHAR' },
+              { column_name: 'rating', data_type: 'INTEGER' },
+              { column_name: 'comment', data_type: 'VARCHAR' },
+              { column_name: 'isFlagged', data_type: 'BOOLEAN' },
+              { column_name: 'createdAt', data_type: 'TIMESTAMP' }
+            ];
+            rowsData = reviews;
+            break;
+          case 'payments':
+            cols = [
+              { column_name: 'transactionId', data_type: 'VARCHAR' },
+              { column_name: 'orderId', data_type: 'VARCHAR' },
+              { column_name: 'amount', data_type: 'NUMERIC' },
+              { column_name: 'paymentMethod', data_type: 'VARCHAR' },
+              { column_name: 'status', data_type: 'VARCHAR' },
+              { column_name: 'createdAt', data_type: 'TIMESTAMP' }
+            ];
+            rowsData = payments;
+            break;
+          case 'orders':
+            cols = [
+              { column_name: 'orderId', data_type: 'VARCHAR' },
+              { column_name: 'userId', data_type: 'VARCHAR' },
+              { column_name: 'userName', data_type: 'VARCHAR' },
+              { column_name: 'branchId', data_type: 'VARCHAR' },
+              { column_name: 'branchName', data_type: 'VARCHAR' },
+              { column_name: 'subtotal', data_type: 'NUMERIC' },
+              { column_name: 'discount', data_type: 'NUMERIC' },
+              { column_name: 'deliveryFee', data_type: 'NUMERIC' },
+              { column_name: 'total', data_type: 'NUMERIC' },
+              { column_name: 'status', data_type: 'VARCHAR' },
+              { column_name: 'createdAt', data_type: 'TIMESTAMP' }
+            ];
+            rowsData = orders;
+            break;
+          default:
+            break;
+        }
+
+        setTableData({ columns: cols, rows: rowsData });
+      } catch (err: any) {
+        setDbError(err.message || String(err));
+      } finally {
+        setLoadingTableData(false);
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/db/tables/${tableName}`);
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      setTableData(data);
+    } catch (err: any) {
+      setDbError(err.message || String(err));
+    } finally {
+      setLoadingTableData(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'db') {
+      fetchTables();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'db' && selectedTable) {
+      fetchTableData(selectedTable);
+    }
+  }, [selectedTable, activeTab]);
 
   const addLog = (method: string, url: string, requestBody?: any): string => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -344,6 +526,9 @@ export const ApiPlayground: React.FC = () => {
             </button>
             <button className="btn" onClick={() => setActiveTab('review')} style={{ justifyContent: 'flex-start', background: activeTab === 'review' ? 'var(--color-primary-light)' : 'transparent', color: 'var(--text-primary)', width: '100%' }}>
               <MessageSquare size={18} /> Reviews & Feedback
+            </button>
+            <button className="btn" onClick={() => setActiveTab('db')} style={{ justifyContent: 'flex-start', background: activeTab === 'db' ? 'var(--color-primary-light)' : 'transparent', color: 'var(--text-primary)', width: '100%' }}>
+              <Database size={18} /> Database Viewer
             </button>
           </div>
         </div>
@@ -659,6 +844,151 @@ export const ApiPlayground: React.FC = () => {
                     <Send size={16} /> Fetch Review Data
                   </button>
                 </form>
+              </div>
+            )}
+
+            {activeTab === 'db' && (
+              <div>
+                <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Database className="text-accent" /> Database Table Inspector
+                  </span>
+                  <button className="btn btn-secondary" onClick={fetchTables} disabled={loadingTables} style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}>
+                    {loadingTables ? 'Refreshing...' : 'Refresh Tables'}
+                  </button>
+                </h3>
+
+                {dbError && (
+                  <div style={{ padding: '1rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error)', borderRadius: 'var(--border-radius-sm)', color: 'var(--error)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                    Error fetching database information: {dbError}
+                  </div>
+                )}
+
+                {loadingTables ? (
+                  <div style={{ color: 'var(--text-muted)', padding: '2rem 0', textAlign: 'center' }}>
+                    Loading database tables metadata...
+                  </div>
+                ) : dbTables.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', padding: '2rem 0', textAlign: 'center' }}>
+                    No public tables found in the database.
+                  </div>
+                ) : (
+                  <div>
+                    {/* Table Selection Pills */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+                      {dbTables.map((tableName) => (
+                        <button
+                          key={tableName}
+                          onClick={() => setSelectedTable(tableName)}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            borderRadius: '20px',
+                            border: '1px solid ' + (selectedTable === tableName ? 'var(--color-primary)' : 'var(--border-color)'),
+                            backgroundColor: selectedTable === tableName ? 'var(--color-primary-light)' : 'rgba(255, 255, 255, 0.05)',
+                            color: 'var(--text-primary)',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: selectedTable === tableName ? 'bold' : 'normal',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {tableName}
+                        </button>
+                      ))}
+                    </div>
+
+                    {selectedTable && (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                          <h4 style={{ color: 'var(--text-primary)', margin: 0 }}>
+                            Table: <code style={{ color: 'var(--color-accent)' }}>{selectedTable}</code>
+                          </h4>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            Showing top 100 rows
+                          </span>
+                        </div>
+
+                        {loadingTableData ? (
+                          <div style={{ color: 'var(--text-muted)', padding: '3rem 0', textAlign: 'center' }}>
+                            Loading table rows and columns...
+                          </div>
+                        ) : tableData ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {/* Column Schema Details */}
+                            <div style={{ padding: '1rem', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--border-radius-sm)', border: '1px solid var(--border-color)' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>SCHEMA STRUCTURE</span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem 1.5rem' }}>
+                                {tableData.columns.map((col: any) => (
+                                  <div key={col.column_name} style={{ fontSize: '0.8rem' }}>
+                                    <code style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{col.column_name}</code>
+                                    <span style={{ color: 'var(--text-muted)', marginLeft: '0.25rem', fontSize: '0.75rem' }}>({col.data_type})</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Data Rows Grid */}
+                            <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', backgroundColor: 'var(--bg-primary)' }}>
+                              {tableData.rows.length === 0 ? (
+                                <div style={{ color: 'var(--text-muted)', padding: '3rem 0', textAlign: 'center', fontSize: '0.9rem' }}>
+                                  No rows found in <code style={{ color: 'var(--color-accent)' }}>{selectedTable}</code>.
+                                </div>
+                              ) : (
+                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '2px solid var(--border-color)', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                                      {tableData.columns.map((col: any) => (
+                                        <th key={col.column_name} style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+                                          {col.column_name}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {tableData.rows.map((row: any, rowIndex: number) => (
+                                      <tr key={rowIndex} style={{ borderBottom: '1px solid var(--border-color)', hover: { backgroundColor: 'rgba(255,255,255,0.01)' } }}>
+                                        {tableData.columns.map((col: any) => {
+                                          const val = row[col.column_name];
+                                          let displayVal = '';
+                                          if (val === null || val === undefined) {
+                                            displayVal = 'NULL';
+                                          } else if (typeof val === 'object') {
+                                            displayVal = JSON.stringify(val);
+                                          } else {
+                                            displayVal = String(val);
+                                          }
+
+                                          return (
+                                            <td 
+                                              key={col.column_name} 
+                                              style={{ 
+                                                padding: '0.75rem 1rem', 
+                                                color: val === null ? 'var(--text-muted)' : 'var(--text-primary)',
+                                                fontFamily: val === null || typeof val === 'object' ? 'monospace' : 'inherit',
+                                                fontSize: val === null || typeof val === 'object' ? '0.75rem' : '0.85rem',
+                                                maxWidth: '300px',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                              }}
+                                              title={displayVal}
+                                            >
+                                              {displayVal}
+                                            </td>
+                                          );
+                                        })}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
