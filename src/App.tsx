@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp, Product } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -15,14 +15,41 @@ import { AdminReviews } from './pages/AdminReviews';
 import { ApiPlayground } from './pages/ApiPlayground';
 
 const AppContent: React.FC = () => {
-  const { currentRole, toast } = useApp();
-  const [activePage, setActivePage] = useState<string>('playground');
+  const { currentUser, setCurrentUser, users, currentRole, setCurrentRole, toast, showNotification, registerUser } = useApp();
+  
+  // Detect if url is /playground at initial load
+  const initialPage = window.location.pathname === '/playground' ? 'playground' : 'home';
+  const [activePage, setActivePage] = useState<string>(initialPage);
   const [searchParam, setSearchParam] = useState<string>('');
   const [categoryParam, setCategoryParam] = useState<string>('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isRegister, setIsRegister] = useState(false);
+
+  // Sync activePage change to URL
+  useEffect(() => {
+    const handleLocationChange = () => {
+      if (window.location.pathname === '/playground') {
+        setActivePage('playground');
+      } else if (activePage === 'playground') {
+        setActivePage('home');
+      }
+    };
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, [activePage]);
 
   // Parse path simulated URL hashes or simple routing triggers
   const navigate = (page: string) => {
+    if (page === 'playground') {
+      window.history.pushState({}, '', '/playground');
+      setActivePage('playground');
+      return;
+    } else {
+      if (window.location.pathname === '/playground') {
+        window.history.pushState({}, '', '/');
+      }
+    }
+
     // Check for queries inside state transition
     if (page.startsWith('catalog')) {
       const query = page.split('?')[1];
@@ -89,6 +116,130 @@ const AppContent: React.FC = () => {
   };
 
   const isAdminView = activePage.startsWith('admin-');
+
+  // Conditional early return ONLY after all Hooks are registered
+  if (!currentUser) {
+    return (
+      <div className="app-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'radial-gradient(circle at top right, #1f2937, #111827)' }}>
+        {toast && (
+          <div className="toast-container">
+            <div className={`toast toast-${toast.type}`}>
+              <span>{toast.message}</span>
+            </div>
+          </div>
+        )}
+        <div className="glass-panel" style={{ width: '420px', padding: '3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div>
+            <span style={{ fontSize: '3rem' }}>🛒</span>
+            <h2 style={{ margin: '0.5rem 0 0 0', fontSize: '1.8rem', fontWeight: 800, color: 'var(--color-accent)' }}>FreshCart</h2>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              {isRegister ? 'Create your new customer account' : 'Sign in to access the supermarket portal'}
+            </p>
+          </div>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const target = e.target as any;
+            const emailInput = target.email.value;
+            
+            if (isRegister) {
+              const fName = target.firstName.value;
+              const lName = target.lastName.value;
+              const pNo = target.phone.value;
+              const addr = target.address.value;
+              
+              try {
+                const newUser = await registerUser({
+                  email: emailInput,
+                  firstName: fName,
+                  lastName: lName,
+                  phone: pNo,
+                  role: 'CUSTOMER'
+                });
+                
+                if (newUser) {
+                  setCurrentUser(newUser);
+                  setCurrentRole(newUser.role);
+                  showNotification(`Welcome, ${newUser.firstName}!`, 'success');
+                  navigate('home');
+                }
+              } catch (err: any) {
+                showNotification(err.message || 'Registration failed', 'error');
+              }
+            } else {
+              const user = users.find(u => u.email.toLowerCase() === emailInput.toLowerCase());
+              if (user) {
+                if (user.status === 'INACTIVE') {
+                  showNotification('This account is deactivated', 'error');
+                  return;
+                }
+                setCurrentUser(user);
+                setCurrentRole(user.role);
+                showNotification(`Welcome back, ${user.firstName}!`, 'success');
+                navigate(user.role === 'ADMIN' || user.role === 'EMPLOYEE' ? 'admin-dashboard' : 'home');
+              } else {
+                showNotification('User not found. Try admin@freshcart.com or john.doe@example.com', 'error');
+              }
+            }
+          }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Email Address</label>
+              <input type="email" name="email" required placeholder="name@freshcart.com" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
+            </div>
+
+            {isRegister && (
+              <>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>First Name</label>
+                    <input type="text" name="firstName" required placeholder="John" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Last Name</label>
+                    <input type="text" name="lastName" required placeholder="Doe" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Phone Number</label>
+                  <input type="text" name="phone" required placeholder="0771234567" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Delivery Address</label>
+                  <input type="text" name="address" required placeholder="No 12, Galle Road, Colombo" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
+                </div>
+              </>
+            )}
+
+            <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem', marginTop: '0.5rem' }}>
+              {isRegister ? 'Create Account' : 'Sign In'}
+            </button>
+          </form>
+
+          <div style={{ fontSize: '0.85rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>
+              {isRegister ? 'Already have an account? ' : 'New to FreshCart? '}
+            </span>
+            <button 
+              className="btn" 
+              onClick={() => setIsRegister(!isRegister)} 
+              style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--color-accent)', fontWeight: 'bold', display: 'inline', cursor: 'pointer' }}
+            >
+              {isRegister ? 'Sign In' : 'Sign Up'}
+            </button>
+          </div>
+
+          {!isRegister && (
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Available credentials:<br/>
+              Admin: <code>admin@freshcart.com</code><br/>
+              Customer: <code>john.doe@example.com</code>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">

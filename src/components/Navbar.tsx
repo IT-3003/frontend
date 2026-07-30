@@ -191,32 +191,34 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
             </>
           )}
 
-          {/* Persona Switcher Switch (Highly interactive demo utility) */}
-          <div style={{ position: 'relative' }}>
-            <button 
-              className="btn" 
-              onClick={() => setShowRoleSelect(!showRoleSelect)} 
-              style={{ 
-                background: 'rgba(212, 175, 55, 0.1)', 
-                border: '1px solid var(--color-accent)', 
-                color: 'var(--color-accent)',
-                fontSize: '0.8rem',
-                padding: '0.4rem 0.8rem',
-                gap: '0.4rem'
-              }}
-            >
-              <ShieldAlert size={14} />
-              <span>Role: {currentRole}</span>
-              <ChevronDown size={12} />
-            </button>
-            {showRoleSelect && (
-              <div className="glass-panel" style={{ position: 'absolute', top: '110%', right: 0, width: '160px', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', zIndex: 150 }}>
-                <button className="btn" onClick={() => handleRoleChange('CUSTOMER')} style={{ justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.5rem', background: currentRole === 'CUSTOMER' ? 'var(--color-primary-light)' : 'transparent', color: 'var(--text-primary)' }}>Customer View</button>
-                <button className="btn" onClick={() => handleRoleChange('EMPLOYEE')} style={{ justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.5rem', background: currentRole === 'EMPLOYEE' ? 'var(--color-primary-light)' : 'transparent', color: 'var(--text-primary)' }}>Employee View</button>
-                <button className="btn" onClick={() => handleRoleChange('ADMIN')} style={{ justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.5rem', background: currentRole === 'ADMIN' ? 'var(--color-primary-light)' : 'transparent', color: 'var(--text-primary)' }}>Admin View</button>
-              </div>
-            )}
-          </div>
+          {/* Persona Switcher Switch (Highly interactive demo utility) - Only visible if currentUser is ADMIN */}
+          {currentUser?.role === 'ADMIN' && (
+            <div style={{ position: 'relative' }}>
+              <button 
+                className="btn" 
+                onClick={() => setShowRoleSelect(!showRoleSelect)} 
+                style={{ 
+                  background: 'rgba(212, 175, 55, 0.1)', 
+                  border: '1px solid var(--color-accent)', 
+                  color: 'var(--color-accent)',
+                  fontSize: '0.8rem',
+                  padding: '0.4rem 0.8rem',
+                  gap: '0.4rem'
+                }}
+              >
+                <ShieldAlert size={14} />
+                <span>Role: {currentRole}</span>
+                <ChevronDown size={12} />
+              </button>
+              {showRoleSelect && (
+                <div className="glass-panel" style={{ position: 'absolute', top: '110%', right: 0, width: '160px', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', zIndex: 150 }}>
+                  <button className="btn" onClick={() => handleRoleChange('CUSTOMER')} style={{ justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.5rem', background: currentRole === 'CUSTOMER' ? 'var(--color-primary-light)' : 'transparent', color: 'var(--text-primary)' }}>Customer View</button>
+                  <button className="btn" onClick={() => handleRoleChange('EMPLOYEE')} style={{ justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.5rem', background: currentRole === 'EMPLOYEE' ? 'var(--color-primary-light)' : 'transparent', color: 'var(--text-primary)' }}>Employee View</button>
+                  <button className="btn" onClick={() => handleRoleChange('ADMIN')} style={{ justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.5rem', background: currentRole === 'ADMIN' ? 'var(--color-primary-light)' : 'transparent', color: 'var(--text-primary)' }}>Admin View</button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Theme Toggle */}
           <button className="btn btn-secondary btn-icon" onClick={toggleTheme} title="Toggle Theme">

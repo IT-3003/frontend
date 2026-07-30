@@ -414,30 +414,30 @@ const DEFAULT_REVIEWS: Review[] = [
 // --- PROVIDER ---
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load state from localStorage or use defaults
+  // Load state from localStorage or use empty defaults (no made up data)
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem('fc_users');
-    return saved ? JSON.parse(saved) : DEFAULT_USERS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [branches, setBranches] = useState<Branch[]>(() => {
     const saved = localStorage.getItem('fc_branches');
-    return saved ? JSON.parse(saved) : DEFAULT_BRANCHES;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('fc_products');
-    return saved ? JSON.parse(saved) : DEFAULT_PRODUCTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [promotions, setPromotions] = useState<Promotion[]>(() => {
     const saved = localStorage.getItem('fc_promotions');
-    return saved ? JSON.parse(saved) : DEFAULT_PROMOTIONS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [reviews, setReviews] = useState<Review[]>(() => {
     const saved = localStorage.getItem('fc_reviews');
-    return saved ? JSON.parse(saved) : DEFAULT_REVIEWS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [payments, setPayments] = useState<Payment[]>(() => {
@@ -450,10 +450,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Current session/UI states
+  // Current session/UI states (no mock defaults)
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('fc_current_user');
-    return saved ? JSON.parse(saved) : DEFAULT_USERS[2]; // Default to customer John Doe
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [currentRole, setCurrentRole] = useState<'CUSTOMER' | 'EMPLOYEE' | 'ADMIN'>(() => {
@@ -463,7 +463,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(() => {
     const saved = localStorage.getItem('fc_selected_branch');
-    return saved ? JSON.parse(saved) : DEFAULT_BRANCHES[0];
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -489,9 +489,163 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [selectedBranch]);
 
   // --- API ASYNC SYNC ON LOAD ---
-  // Unimplemented list/fetch endpoints on the backend are omitted here to prevent console warnings and unnecessary network errors, allowing the frontend to use local seed data while still hitting the correct backend endpoints for actions.
   useEffect(() => {
-    // Left empty since GET list endpoints are not implemented in the backend.
+    const loadRealData = async () => {
+      try {
+        const backendUsers = await apiRequest('/user');
+        if (Array.isArray(backendUsers)) {
+          const mappedUsers = backendUsers.map((bu: any) => ({
+            userId: `usr_${bu.id}`,
+            email: bu.email,
+            firstName: bu.firstName,
+            lastName: bu.lastName,
+            phone: bu.phoneNumber,
+            role: bu.role || 'CUSTOMER',
+            status: bu.active ? 'ACTIVE' : 'INACTIVE',
+            addresses: bu.address ? [{
+              id: `addr_${bu.id}`,
+              street: bu.address,
+              city: 'Colombo',
+              zipCode: '00100',
+              isDefault: true
+            }] : []
+          }));
+          setUsers(mappedUsers);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch users from backend:", e);
+      }
+
+      try {
+        const backendBranches = await apiRequest('/branch');
+        if (Array.isArray(backendBranches)) {
+          const mappedBranches = backendBranches.map((bb: any) => ({
+            branchId: `br_${bb.branchId}`,
+            name: bb.branchName,
+            address: bb.address,
+            managerId: `usr_${bb.managerId}`,
+            managerName: `Manager ${bb.managerId}`,
+            phoneNumber: bb.phoneNumber,
+            openingHours: bb.openingHours,
+            isActive: bb.active !== false
+          }));
+          setBranches(mappedBranches);
+          if (mappedBranches.length > 0 && !selectedBranch) {
+            setSelectedBranch(mappedBranches[0]);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch branches from backend:", e);
+      }
+
+      try {
+        const backendItems = await apiRequest('/item/all');
+        if (Array.isArray(backendItems)) {
+          const mappedProducts = backendItems.map((bi: any) => ({
+            itemId: `item_${bi.itemId}`,
+            name: bi.itemName,
+            sku: bi.brand ? `${bi.brand.toUpperCase()}-${bi.itemId}` : `SKU-${bi.itemId}`,
+            category: bi.category,
+            description: bi.description,
+            price: bi.baseprice,
+            imageUrl: bi.imageUrl,
+            isDiscontinued: false,
+            branchStock: {
+              'br_1': bi.stockQuantity,
+              'br_2': Math.max(0, bi.stockQuantity - 5),
+              'br_3': Math.max(0, bi.stockQuantity - 10)
+            }
+          }));
+          setProducts(mappedProducts);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch items from backend:", e);
+      }
+
+      try {
+        const backendPromotions = await apiRequest('/promotion');
+        if (Array.isArray(backendPromotions)) {
+          const mappedPromotions = backendPromotions.map((bp: any) => ({
+            promoId: `promo_${bp.promotionId}`,
+            code: bp.promotionName.toUpperCase().replace(/\s+/g, '_'),
+            description: bp.description,
+            discountType: bp.discountType === 'PERCENTAGE' ? 'PERCENTAGE' : 'FIXED_AMOUNT',
+            discountValue: bp.discountValue,
+            startDate: bp.startDate,
+            endDate: bp.endDate,
+            isActive: true,
+            applicableItemIds: bp.itemId ? [`item_${bp.itemId}`] : []
+          }));
+          setPromotions(mappedPromotions);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch promotions from backend:", e);
+      }
+
+      try {
+        const backendReviews = await apiRequest('/reviews');
+        if (Array.isArray(backendReviews)) {
+          const mappedReviews = backendReviews.map((br: any) => ({
+            reviewId: `rev_${br.reviewId}`,
+            userId: `usr_${br.userId}`,
+            productId: `item_${br.itemId}`,
+            userName: `User ${br.userId}`,
+            rating: br.rating,
+            comment: br.comment,
+            createdAt: new Date().toISOString()
+          }));
+          setReviews(mappedReviews);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch reviews from backend:", e);
+      }
+
+      try {
+        const backendPayments = await apiRequest('/payment/all');
+        if (Array.isArray(backendPayments)) {
+          const mappedPayments = backendPayments.map((bp: any) => ({
+            transactionId: `tx_${bp.paymentId}`,
+            orderId: `ord_${bp.orderId}`,
+            amount: bp.amount,
+            paymentMethod: bp.paymentMethod || 'CASH_ON_DELIVERY',
+            status: bp.status || 'COMPLETED',
+            createdAt: bp.paymentDate || new Date().toISOString()
+          }));
+          setPayments(mappedPayments);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch payments from backend:", e);
+      }
+
+      try {
+        const backendOrders = await apiRequest('/order');
+        if (Array.isArray(backendOrders)) {
+          const mappedOrders = backendOrders.map((bo: any) => ({
+            orderId: `ord_${bo.orderId}`,
+            userId: `usr_${bo.userId}`,
+            branchId: `br_${bo.branchId}`,
+            items: Array.isArray(bo.orderItems) ? bo.orderItems.map((oi: any) => ({
+              itemId: `item_${oi.productId}`,
+              name: oi.productName || `Product ${oi.productId}`,
+              price: oi.unitPrice,
+              quantity: oi.quantity
+            })) : [],
+            subtotal: bo.subtotal,
+            discount: bo.discountAmount,
+            total: bo.totalAmount,
+            status: bo.status || 'PENDING',
+            deliveryAddress: bo.deliveryAddress || '',
+            paymentMethod: 'CASH_ON_DELIVERY',
+            paymentStatus: bo.paymentId ? 'COMPLETED' : 'PENDING',
+            createdAt: bo.orderDate || new Date().toISOString()
+          }));
+          setOrders(mappedOrders);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch orders from backend:", e);
+      }
+    };
+    loadRealData();
   }, []);
 
   // Handle Notifications
@@ -636,8 +790,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUser = async (userId: string, updates: Partial<User>) => {
     try {
-      // Profile update endpoint is not implemented in backend, simulation only
-      await apiRequest('/user/profile', {
+      const numericId = toNumericId(userId);
+      await apiRequest(`/user/${numericId}`, {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
