@@ -182,7 +182,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const API_BASE = '/api';
 
 // Helper for calling API endpoints
-const apiRequest = async (path: string, options?: RequestInit) => {
+export const apiRequest = async (path: string, options?: RequestInit) => {
   const token = localStorage.getItem('fc_token');
   const headers: HeadersInit = {
     'Content-Type': 'application/json',

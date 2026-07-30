@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppProvider, useApp, Product } from './context/AppContext';
+import { AppProvider, useApp, Product, apiRequest } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { CustomerHome } from './pages/CustomerHome';
@@ -146,6 +146,7 @@ const AppContent: React.FC = () => {
               const lName = target.lastName.value;
               const pNo = target.phone.value;
               const addr = target.address.value;
+              const pwd = target.password.value;
               
               try {
                 const newUser = await registerUser({
@@ -154,7 +155,8 @@ const AppContent: React.FC = () => {
                   lastName: lName,
                   phone: pNo,
                   role: 'CUSTOMER',
-                  address: addr
+                  address: addr,
+                  password: pwd
                 });
                 
                 if (newUser) {
@@ -167,24 +169,52 @@ const AppContent: React.FC = () => {
                 showNotification(err.message || 'Registration failed', 'error');
               }
             } else {
-              const user = users.find(u => u.email.toLowerCase() === emailInput.toLowerCase());
-              if (user) {
-                if (user.status === 'INACTIVE') {
+              const passwordInput = target.password.value;
+              try {
+                const response = await apiRequest('/user/login', {
+                  method: 'POST',
+                  body: JSON.stringify({ email: emailInput, password: passwordInput })
+                });
+                
+                const mappedUser: User = {
+                  userId: String(response.id),
+                  email: response.email,
+                  firstName: response.firstName,
+                  lastName: response.lastName,
+                  phone: response.phoneNumber || response.phone || '',
+                  role: response.role === 'STAFF' ? 'EMPLOYEE' : response.role,
+                  status: response.active ? 'ACTIVE' : 'INACTIVE',
+                  addresses: response.address ? [{
+                    id: `addr_${response.id}`,
+                    street: response.address,
+                    city: 'Colombo',
+                    zipCode: '00100',
+                    isDefault: true
+                  }] : []
+                };
+
+                if (mappedUser.status === 'INACTIVE') {
                   showNotification('This account is deactivated', 'error');
                   return;
                 }
-                setCurrentUser(user);
-                setCurrentRole(user.role);
-                showNotification(`Welcome back, ${user.firstName}!`, 'success');
-                navigate(user.role === 'ADMIN' || user.role === 'EMPLOYEE' ? 'admin-dashboard' : 'home');
-              } else {
-                showNotification('User not found. Try admin@freshcart.com or john.doe@example.com', 'error');
+
+                setCurrentUser(mappedUser);
+                setCurrentRole(mappedUser.role);
+                showNotification(`Welcome back, ${mappedUser.firstName}!`, 'success');
+                navigate(mappedUser.role === 'ADMIN' || mappedUser.role === 'EMPLOYEE' ? 'admin-dashboard' : 'home');
+              } catch (err: any) {
+                showNotification('Invalid credentials. Check email or password.', 'error');
               }
             }
           }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Email Address</label>
               <input type="email" name="email" required placeholder="name@freshcart.com" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Password</label>
+              <input type="password" name="password" required placeholder="••••••••" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
             </div>
 
             {isRegister && (
