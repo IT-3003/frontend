@@ -129,7 +129,7 @@ interface AppContextType {
 
   // 1. User Management
   users: User[];
-  registerUser: (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string }) => Promise<User>;
+  registerUser: (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string; address?: string }) => Promise<User>;
   updateUser: (userId: string, updates: Partial<User>) => Promise<void>;
   deactivateUser: (userId: string) => Promise<void>;
 
@@ -202,7 +202,7 @@ const apiRequest = async (path: string, options?: RequestInit) => {
 
 // --- SEED MOCK DATA ---
 
-const DEFAULT_USERS: User[] = [
+export const DEFAULT_USERS: User[] = [
   {
     userId: 'usr_admin',
     email: 'admin@freshcart.com',
@@ -243,7 +243,7 @@ const DEFAULT_USERS: User[] = [
   }
 ];
 
-const DEFAULT_BRANCHES: Branch[] = [
+export const DEFAULT_BRANCHES: Branch[] = [
   {
     branchId: 'br_001',
     name: 'Springfield Mall (HQ)',
@@ -273,7 +273,7 @@ const DEFAULT_BRANCHES: Branch[] = [
   }
 ];
 
-const DEFAULT_PRODUCTS: Product[] = [
+export const DEFAULT_PRODUCTS: Product[] = [
   {
     itemId: 'itm_banana',
     name: 'Fresh Organic Bananas',
@@ -342,7 +342,7 @@ const DEFAULT_PRODUCTS: Product[] = [
   }
 ];
 
-const DEFAULT_PROMOTIONS: Promotion[] = [
+export const DEFAULT_PROMOTIONS: Promotion[] = [
   {
     promoId: 'prm_save10',
     code: 'SAVE10',
@@ -378,7 +378,7 @@ const DEFAULT_PROMOTIONS: Promotion[] = [
   }
 ];
 
-const DEFAULT_REVIEWS: Review[] = [
+export const DEFAULT_REVIEWS: Review[] = [
   {
     reviewId: 'rev_1',
     itemId: 'itm_banana',
@@ -499,9 +499,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             email: bu.email,
             firstName: bu.firstName,
             lastName: bu.lastName,
-            phone: bu.phoneNumber,
-            role: bu.role || 'CUSTOMER',
-            status: bu.active ? 'ACTIVE' : 'INACTIVE',
+            phone: bu.phoneNumber || '',
+            role: (bu.role === 'STAFF' ? 'EMPLOYEE' : bu.role) as User['role'],
+            status: (bu.active ? 'ACTIVE' : 'INACTIVE') as User['status'],
             addresses: bu.address ? [{
               id: `addr_${bu.id}`,
               street: bu.address,
@@ -569,12 +569,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             promoId: `promo_${bp.promotionId}`,
             code: bp.promotionName.toUpperCase().replace(/\s+/g, '_'),
             description: bp.description,
-            discountType: bp.discountType === 'PERCENTAGE' ? 'PERCENTAGE' : 'FIXED_AMOUNT',
-            discountValue: bp.discountValue,
-            startDate: bp.startDate,
-            endDate: bp.endDate,
-            isActive: true,
-            applicableItemIds: bp.itemId ? [`item_${bp.itemId}`] : []
+            discountPercent: bp.discountValue,
+            type: (bp.discountType === 'BANNER' ? 'BANNER' : 'COUPON') as Promotion['type'],
+            bannerImageUrl: bp.bannerImageUrl || '',
+            expiryDate: bp.endDate ? new Date(bp.endDate).toISOString() : new Date().toISOString(),
+            targetBranchId: bp.itemId ? String(bp.itemId) : null,
+            isActive: true
           }));
           setPromotions(mappedPromotions);
         }
@@ -588,10 +588,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const mappedReviews = backendReviews.map((br: any) => ({
             reviewId: `rev_${br.reviewId}`,
             userId: `usr_${br.userId}`,
-            productId: `item_${br.itemId}`,
+            itemId: `item_${br.itemId}`,
             userName: `User ${br.userId}`,
             rating: br.rating,
             comment: br.comment,
+            isFlagged: false,
             createdAt: new Date().toISOString()
           }));
           setReviews(mappedReviews);
@@ -623,7 +624,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const mappedOrders = backendOrders.map((bo: any) => ({
             orderId: `ord_${bo.orderId}`,
             userId: `usr_${bo.userId}`,
+            userName: `Customer ${bo.userId}`,
             branchId: `br_${bo.branchId}`,
+            branchName: `Branch ${bo.branchId}`,
             items: Array.isArray(bo.orderItems) ? bo.orderItems.map((oi: any) => ({
               itemId: `item_${oi.productId}`,
               name: oi.productName || `Product ${oi.productId}`,
@@ -632,11 +635,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             })) : [],
             subtotal: bo.subtotal,
             discount: bo.discountAmount,
+            deliveryFee: bo.deliveryAddress ? 3.99 : 0,
             total: bo.totalAmount,
-            status: bo.status || 'PENDING',
-            deliveryAddress: bo.deliveryAddress || '',
-            paymentMethod: 'CASH_ON_DELIVERY',
-            paymentStatus: bo.paymentId ? 'COMPLETED' : 'PENDING',
+            status: (bo.status || 'PROCESSING') as Order['status'],
+            deliveryAddress: bo.deliveryAddress ? {
+              id: `addr_${bo.orderId}`,
+              street: bo.deliveryAddress,
+              city: 'Colombo',
+              zipCode: '00100',
+              isDefault: false
+            } : null,
             createdAt: bo.orderDate || new Date().toISOString()
           }));
           setOrders(mappedOrders);
@@ -742,18 +750,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- 1. USER MANAGEMENT ---
 
-  const registerUser = async (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string }) => {
+  const registerUser = async (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string; address?: string }) => {
     const numericId = Math.floor(100000 + Math.random() * 900000);
     const backendUserPayload = {
       id: numericId,
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email,
-      passwordHash: data.password || 'SecurePassword123!',
+      password: data.password || 'SecurePassword123!',
       phoneNumber: data.phone || '',
       role: data.role === 'EMPLOYEE' ? 'STAFF' : data.role,
       active: true,
-      type: data.role === 'ADMIN' ? 'admin' : (data.role === 'EMPLOYEE' ? 'staff' : 'customer')
+      type: data.role === 'ADMIN' ? 'admin' : (data.role === 'EMPLOYEE' ? 'staff' : 'customer'),
+      address: data.address || ''
     };
 
     try {
@@ -769,7 +778,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         phone: response.phoneNumber || response.phone || '',
         role: response.role === 'STAFF' ? 'EMPLOYEE' : response.role,
         status: response.active ? 'ACTIVE' : 'INACTIVE',
-        addresses: []
+        addresses: response.address ? [{
+          id: `addr_${response.id}`,
+          street: response.address,
+          city: 'Colombo',
+          zipCode: '00100',
+          isDefault: true
+        }] : []
       };
       setUsers((prev) => [...prev, mappedUser]);
       showNotification(`Account created for ${mappedUser.firstName}!`, 'success');
@@ -780,7 +795,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...data,
         userId: 'usr_' + numericId,
         status: 'ACTIVE',
-        addresses: []
+        addresses: data.address ? [{
+          id: `addr_${numericId}`,
+          street: data.address,
+          city: 'Colombo',
+          zipCode: '00100',
+          isDefault: true
+        }] : []
       };
       setUsers((prev) => [...prev, newUser]);
       showNotification(`[Simulation] Account created for ${newUser.firstName}!`, 'success');
@@ -904,11 +925,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addProduct = async (data: Omit<Product, 'itemId' | 'isDiscontinued'>) => {
     const numericId = Math.floor(100000 + Math.random() * 900000);
+    const totalStock = Object.values(data.branchStock || {}).reduce((a, b) => a + b, 0) || 100;
     const backendItemPayload = {
       itemId: numericId,
       itemName: data.name,
       category: data.category,
-      baseprice: data.price
+      baseprice: data.price,
+      brand: data.sku ? data.sku.split('-')[0] : 'FreshCart',
+      imageUrl: data.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500',
+      description: data.description || 'Premium product from FreshCart.',
+      costPrice: Number((data.price * 0.7).toFixed(2)) || 1.0,
+      stockQuantity: totalStock
     };
 
     try {
@@ -919,11 +946,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const mappedProduct: Product = {
         itemId: String(response.itemId),
         name: response.itemName,
-        sku: data.sku || '',
+        sku: data.sku || `SKU-${response.itemId}`,
         category: response.category,
-        description: data.description || '',
+        description: response.description || '',
         price: response.baseprice,
-        imageUrl: data.imageUrl || '',
+        imageUrl: response.imageUrl || '',
         isDiscontinued: false,
         branchStock: data.branchStock || {}
       };
@@ -945,11 +972,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateProduct = async (itemId: string, updates: Partial<Product>) => {
     const numericId = toNumericId(itemId);
+    const existing = products.find(p => p.itemId === itemId);
+    const name = updates.name !== undefined ? updates.name : (existing?.name || '');
+    const category = updates.category !== undefined ? updates.category : (existing?.category || '');
+    const price = updates.price !== undefined ? updates.price : (existing?.price || 0.0);
+    const sku = updates.sku !== undefined ? updates.sku : (existing?.sku || '');
+    const imageUrl = updates.imageUrl !== undefined ? updates.imageUrl : (existing?.imageUrl || '');
+    const description = updates.description !== undefined ? updates.description : (existing?.description || '');
+    const stock = updates.branchStock !== undefined ? Object.values(updates.branchStock).reduce((a, b) => a + b, 0) : (existing ? Object.values(existing.branchStock).reduce((a, b) => a + b, 0) : 100);
+
     const backendItemPayload = {
       itemId: numericId,
-      itemName: updates.name,
-      category: updates.category,
-      baseprice: updates.price
+      itemName: name,
+      category: category,
+      baseprice: price,
+      brand: sku ? sku.split('-')[0] : 'FreshCart',
+      imageUrl: imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500',
+      description: description || 'Premium product from FreshCart.',
+      costPrice: Number((price * 0.7).toFixed(2)) || 1.0,
+      stockQuantity: stock
     };
 
     try {
@@ -985,31 +1026,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createPayment = async (orderId: string, amount: number, method: Payment['paymentMethod']) => {
     const numericPaymentId = Math.floor(100000 + Math.random() * 900000);
     
-    let backendMethod = 'CARD';
-    if (method === 'CASH_ON_DELIVERY') backendMethod = 'CASH';
-    else if (method === 'MOBILE_WALLET') backendMethod = 'ONLINE';
+    let backendMethod = 'CASH';
+    if (method === 'CREDIT_CARD') backendMethod = 'CREDIT_CARD';
+    else if (method === 'DEBIT_CARD') backendMethod = 'DEBIT_CARD';
+    else if (method === 'MOBILE_WALLET') backendMethod = 'PAYPAL';
 
     const backendPaymentPayload = {
       paymentId: numericPaymentId,
-      orderId: toNumericId(orderId),
-      userId: currentUser ? toNumericId(currentUser.userId) : 1,
+      order: { orderId: toNumericId(orderId) },
+      user: { id: currentUser ? toNumericId(currentUser.userId) : 1 },
       amount: amount,
       paymentMethod: backendMethod,
       transaction: 'tx_' + numericPaymentId,
-      paymentStatus: 'PENDING',
+      paymentStatus: 'SUCCESS',
       paymentDate: new Date().toISOString(),
       isActive: true
     };
 
     try {
-      const response = await apiRequest('/janindu/create', {
+      const response = await apiRequest('/payment/create', {
         method: 'POST',
         body: JSON.stringify(backendPaymentPayload)
       });
 
       let frontendMethod: Payment['paymentMethod'] = 'CREDIT_CARD';
       if (response.paymentMethod === 'CASH') frontendMethod = 'CASH_ON_DELIVERY';
-      else if (response.paymentMethod === 'ONLINE') frontendMethod = 'MOBILE_WALLET';
+      else if (response.paymentMethod === 'PAYPAL') frontendMethod = 'MOBILE_WALLET';
+      else if (response.paymentMethod === 'DEBIT_CARD') frontendMethod = 'DEBIT_CARD';
 
       let frontendStatus: Payment['status'] = 'PENDING';
       if (response.paymentStatus === 'SUCCESS') frontendStatus = 'COMPLETED';
@@ -1017,7 +1060,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const mappedPayment: Payment = {
         transactionId: response.transaction || String(response.paymentId),
-        orderId: String(response.orderId),
+        orderId: String(response.order ? response.order.orderId : response.orderId),
         amount: response.amount,
         paymentMethod: frontendMethod,
         status: frontendStatus,
@@ -1107,15 +1150,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const deliveryFee = deliveryAddress ? 3.99 : 0;
     const total = Number((subtotal - discount + deliveryFee).toFixed(2));
 
+    const assignedOrderId = Math.floor(100000 + Math.random() * 900000);
     const orderPayload = {
-      branchId: selectedBranch.branchId,
-      items: cart.map((i) => ({ itemId: i.product.itemId, quantity: i.quantity })),
+      orderId: assignedOrderId,
+      user: { id: toNumericId(currentUser.userId) },
+      branch: { branchId: toNumericId(selectedBranch.branchId) },
+      orderItems: cart.map((i) => {
+        const itemNumId = toNumericId(i.product.itemId);
+        const itemQty = i.quantity;
+        return {
+          orderItemId: Math.floor(100000 + Math.random() * 900000),
+          product: { itemId: itemNumId },
+          productName: i.product.name,
+          quantity: itemQty,
+          unitPrice: i.product.price,
+          lineTotal: Number((i.product.price * itemQty).toFixed(2))
+        };
+      }),
+      subtotal: Number(subtotal.toFixed(2)),
+      discountAmount: Number(discount.toFixed(2)),
       couponCode: activeCoupon?.code || null,
-      deliveryAddressId: deliveryAddress?.id || null
+      totalAmount: total,
+      status: 'PROCESSING',
+      deliveryAddress: deliveryAddress ? deliveryAddress.street : 'In-Store Pickup',
+      orderDate: new Date().toISOString()
     };
 
     try {
-      const response = await apiRequest('/orders', {
+      const response = await apiRequest('/order/create', {
         method: 'POST',
         body: JSON.stringify(orderPayload)
       });
@@ -1138,12 +1200,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })
       );
 
-      setOrders((prev) => [response, ...prev]);
-      return response;
+      const mappedOrder: Order = {
+        orderId: String(response.orderId),
+        userId: currentUser.userId,
+        userName: `${currentUser.firstName} ${currentUser.lastName}`,
+        branchId: selectedBranch.branchId,
+        branchName: selectedBranch.name,
+        items: cart.map((i) => ({
+          itemId: i.product.itemId,
+          name: i.product.name,
+          price: i.product.price,
+          quantity: i.quantity
+        })),
+        subtotal: Number(subtotal.toFixed(2)),
+        discount: Number(discount.toFixed(2)),
+        deliveryFee,
+        total,
+        status: response.status || 'PROCESSING',
+        deliveryAddress,
+        createdAt: response.orderDate || new Date().toISOString()
+      };
+
+      setOrders((prev) => [mappedOrder, ...prev]);
+      return mappedOrder;
     } catch (e) {
       console.warn("Backend API place order failed, simulating locally:", e);
       const newOrder: Order = {
-        orderId: 'ord_' + Math.floor(100000 + Math.random() * 900000).toString(),
+        orderId: 'ord_' + assignedOrderId.toString(),
         userId: currentUser.userId,
         userName: `${currentUser.firstName} ${currentUser.lastName}`,
         branchId: selectedBranch.branchId,
@@ -1248,6 +1331,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addPromotion = async (data: Omit<Promotion, 'promoId'>) => {
     const numericPromoId = Math.floor(100000 + Math.random() * 900000);
+    const itemNumId = data.targetBranchId ? toNumericId(data.targetBranchId) : 1; // Backend requires an item, use targetBranchId or default to 1 (banana)
     const backendPromoPayload = {
       promotionId: numericPromoId,
       promotionName: data.code,
@@ -1256,7 +1340,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       discountType: data.type,
       startDate: new Date().toISOString().split('T')[0],
       endDate: data.expiryDate ? data.expiryDate.split('T')[0] : new Date().toISOString().split('T')[0],
-      itemId: data.targetBranchId ? toNumericId(data.targetBranchId) : 0
+      item: { itemId: itemNumId }
     };
 
     try {
@@ -1272,7 +1356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: response.discountType === 'BANNER' ? 'BANNER' : 'COUPON',
         bannerImageUrl: data.bannerImageUrl || '',
         expiryDate: response.endDate ? new Date(response.endDate).toISOString() : new Date().toISOString(),
-        targetBranchId: response.itemId ? String(response.itemId) : null,
+        targetBranchId: response.item ? String(response.item.itemId) : null,
         isActive: true
       };
       setPromotions((prev) => [...prev, mappedPromo]);

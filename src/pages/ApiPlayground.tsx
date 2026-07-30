@@ -946,7 +946,7 @@ export const ApiPlayground: React.FC = () => {
                                   </thead>
                                   <tbody>
                                     {tableData.rows.map((row: any, rowIndex: number) => (
-                                      <tr key={rowIndex} style={{ borderBottom: '1px solid var(--border-color)', hover: { backgroundColor: 'rgba(255,255,255,0.01)' } }}>
+                                      <tr key={rowIndex} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                         {tableData.columns.map((col: any) => {
                                           const val = row[col.column_name];
                                           let displayVal = '';

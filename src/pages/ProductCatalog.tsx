@@ -34,10 +34,12 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   
   // Selected detail modal
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     if (selectedProduct) {
       setDetailProduct(selectedProduct);
+      setQuantity(1);
     }
   }, [selectedProduct]);
 
@@ -118,14 +120,14 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
             return (
               <div key={prod.itemId} className="glass-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
                 <div 
-                  onClick={() => setDetailProduct(prod)}
+                  onClick={() => { setDetailProduct(prod); setQuantity(1); }}
                   style={{ height: '180px', overflow: 'hidden', background: '#000', cursor: 'pointer' }}
                 >
                   <img src={prod.imageUrl} alt={prod.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', flexGrow: 1, gap: '0.5rem' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{prod.category}</span>
-                  <h4 onClick={() => setDetailProduct(prod)} style={{ cursor: 'pointer', margin: 0, fontSize: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <h4 onClick={() => { setDetailProduct(prod); setQuantity(1); }} style={{ cursor: 'pointer', margin: 0, fontSize: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {prod.name}
                   </h4>
                   
@@ -213,9 +215,44 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                   </div>
                 )}
 
+                {(!selectedBranch || (activeProduct.branchStock[selectedBranch.branchId] || 0) > 0) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '0.5rem 0' }}>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Select Quantity:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <button 
+                        className="btn btn-secondary btn-icon" 
+                        onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+                        style={{ padding: '0.25rem 0.5rem', minWidth: '30px' }}
+                      >
+                        -
+                      </button>
+                      <input 
+                        type="number" 
+                        value={quantity} 
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 1;
+                          const maxStock = selectedBranch ? (activeProduct.branchStock[selectedBranch.branchId] || 99) : 99;
+                          setQuantity(Math.max(1, Math.min(maxStock, val)));
+                        }}
+                        style={{ width: '60px', textAlign: 'center', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.25rem', borderRadius: 'var(--border-radius-sm)' }} 
+                      />
+                      <button 
+                        className="btn btn-secondary btn-icon" 
+                        onClick={() => setQuantity(prev => {
+                          const maxStock = selectedBranch ? (activeProduct.branchStock[selectedBranch.branchId] || 99) : 99;
+                          return Math.min(maxStock, prev + 1);
+                        })}
+                        style={{ padding: '0.25rem 0.5rem', minWidth: '30px' }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button 
                   className="btn btn-primary" 
-                  onClick={() => addToCart(activeProduct)}
+                  onClick={() => addToCart(activeProduct, quantity)}
                   disabled={!!(selectedBranch && (activeProduct.branchStock[selectedBranch.branchId] || 0) <= 0)}
                   style={{ width: '100%', padding: '0.8rem', gap: '0.5rem' }}
                 >

@@ -153,7 +153,8 @@ const AppContent: React.FC = () => {
                   firstName: fName,
                   lastName: lName,
                   phone: pNo,
-                  role: 'CUSTOMER'
+                  role: 'CUSTOMER',
+                  address: addr
                 });
                 
                 if (newUser) {
