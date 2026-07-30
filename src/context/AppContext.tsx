@@ -1034,7 +1034,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const backendPaymentPayload = {
       paymentId: numericPaymentId,
       order: { orderId: toNumericId(orderId) },
-      user: { id: currentUser ? toNumericId(currentUser.userId) : 1 },
+      user: { 
+        id: currentUser ? toNumericId(currentUser.userId) : 1,
+        type: currentUser ? (currentUser.role === 'ADMIN' ? 'admin' : (currentUser.role === 'EMPLOYEE' ? 'staff' : 'customer')) : 'customer'
+      },
       amount: amount,
       paymentMethod: backendMethod,
       transaction: 'tx_' + numericPaymentId,
@@ -1153,7 +1156,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const assignedOrderId = Math.floor(100000 + Math.random() * 900000);
     const orderPayload = {
       orderId: assignedOrderId,
-      user: { id: toNumericId(currentUser.userId) },
+      user: { 
+        id: toNumericId(currentUser.userId),
+        type: currentUser.role === 'ADMIN' ? 'admin' : (currentUser.role === 'EMPLOYEE' ? 'staff' : 'customer')
+      },
       branch: { branchId: toNumericId(selectedBranch.branchId) },
       orderItems: cart.map((i) => {
         const itemNumId = toNumericId(i.product.itemId);
