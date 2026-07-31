@@ -37,8 +37,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({ onNavigate, onSelect
       
       {/* 1. HERO PROMOTION BANNER CAROUSEL */}
       {activeBanners.length > 0 ? (
-        <div style={{ position: 'relative', height: '400px', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-lg)' }}>
-          <div style={{ 
+        <div className="hero-carousel" style={{ position: 'relative', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-lg)' }}>
+          <div className="hero-slide-content" style={{ 
             width: '100%', 
             height: '100%', 
             backgroundImage: `linear-gradient(to right, rgba(11,19,14,0.9) 30%, rgba(11,19,14,0.3)), url(${activeBanners[activeBannerIndex].bannerImageUrl})`,
@@ -46,12 +46,11 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({ onNavigate, onSelect
             backgroundPosition: 'center',
             display: 'flex',
             alignItems: 'center',
-            padding: '4rem',
             transition: 'background-image 0.5s ease-in-out'
           }}>
             <div style={{ maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <span className="badge badge-success" style={{ alignSelf: 'flex-start' }}>PROMO CODE: {activeBanners[activeBannerIndex].code}</span>
-              <h1 style={{ fontSize: '3rem', color: 'var(--text-primary)', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+              <h1 className="hero-slide-title" style={{ color: 'var(--text-primary)', textShadow: '0 2px 4px rgba(0,0,0,0.5)', margin: 0 }}>
                 Save {activeBanners[activeBannerIndex].discountPercent}% Today!
               </h1>
               <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)' }}>

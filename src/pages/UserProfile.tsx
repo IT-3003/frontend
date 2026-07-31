@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp, Address } from '../context/AppContext';
+import { useApp, Address, apiRequest } from '../context/AppContext';
 import { User, Key, MapPin, Trash2, ShieldX, Package } from 'lucide-react';
 
 interface UserProfileProps {
@@ -50,15 +50,28 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
     updateUser(currentUser.userId, { firstName, lastName, phone });
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password || !newPassword) {
       showNotification('Please fill in both fields', 'error');
       return;
     }
-    showNotification('Password updated successfully (simulated hash update)', 'success');
-    setPassword('');
-    setNewPassword('');
+    
+    try {
+      // Validate current password against the backend first
+      await apiRequest('/user/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: currentUser.email, password: password })
+      });
+      
+      // If validation succeeds, update to the new password
+      await updateUser(currentUser.userId, { password: newPassword });
+      
+      setPassword('');
+      setNewPassword('');
+    } catch (err: any) {
+      showNotification('Invalid current password. Update rejected.', 'error');
+    }
   };
 
   const handleAddAddress = (e: React.FormEvent) => {

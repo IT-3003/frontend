@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { ShoppingCart, User as UserIcon, Store, LogOut, ChevronDown, ShieldAlert, Sparkles, Sun, Moon } from 'lucide-react';
+import { ShoppingCart, User as UserIcon, Store, LogOut, ChevronDown, ShieldAlert, Sparkles, Sun, Moon, Menu, X } from 'lucide-react';
 
 interface NavbarProps {
   onNavigate: (page: string) => void;
@@ -35,6 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
 
   // Dark/Light Mode state
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [showMobileDrawer, setShowMobileDrawer] = useState(false);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -113,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
 
   return (
     <>
-      <header className="glass-panel" style={{ margin: '1rem', padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: '1rem', zIndex: 100 }}>
+      <header className="glass-panel app-header">
         {/* Brand Logo */}
         <div onClick={() => onNavigate(currentRole === 'CUSTOMER' ? 'home' : 'admin-dashboard')} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
           <span style={{ fontSize: '2rem' }}>🛒</span>
@@ -125,8 +126,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
           </div>
         </div>
 
-        {/* Navigation Elements */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+        {/* Navigation Elements (Desktop) */}
+        <div className="nav-desktop-only">
           {/* Branch Locator Dropdown (For Customer & Staff) */}
           <div style={{ position: 'relative' }}>
             <button className="btn btn-secondary" onClick={() => setShowBranchSelect(!showBranchSelect)} style={{ gap: '0.5rem', display: 'flex', alignItems: 'center' }}>
@@ -279,7 +280,142 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
             </button>
           )}
         </div>
+
+        {/* Mobile Hamburger Button */}
+        <button 
+          className="nav-mobile-only btn btn-secondary btn-icon" 
+          onClick={() => setShowMobileDrawer(true)}
+          style={{ display: 'none' }}
+        >
+          <Menu size={22} />
+        </button>
       </header>
+
+      {/* MOBILE DRAWER */}
+      {showMobileDrawer && (
+        <>
+          <div className="mobile-drawer-backdrop" onClick={() => setShowMobileDrawer(false)} />
+          <div className="mobile-drawer">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: 'var(--color-accent)' }}>Menu</h3>
+              <button className="btn btn-secondary btn-icon" onClick={() => setShowMobileDrawer(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Store Location */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>STORE LOCATION</span>
+              <button className="btn btn-secondary" onClick={() => { setShowBranchSelect(!showBranchSelect); }} style={{ justifyContent: 'space-between', width: '100%', display: 'flex', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Store size={16} />
+                  <span style={{ fontSize: '0.85rem' }}>{selectedBranch ? selectedBranch.name : 'Select Location'}</span>
+                </div>
+                <ChevronDown size={14} />
+              </button>
+              {showBranchSelect && (
+                <div className="glass-panel" style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
+                  {branches.filter(b => b.isActive).map(b => (
+                    <button 
+                      key={b.branchId} 
+                      className="btn" 
+                      onClick={() => { setSelectedBranch(b); setShowBranchSelect(false); setShowMobileDrawer(false); showNotification(`Shopping branch: ${b.name}`); }}
+                      style={{ 
+                        justifyContent: 'flex-start', 
+                        background: selectedBranch?.branchId === b.branchId ? 'var(--color-primary-light)' : 'transparent',
+                        color: 'var(--text-primary)',
+                        textAlign: 'left',
+                        fontSize: '0.8rem',
+                        padding: '0.5rem'
+                      }}
+                    >
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Links */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>NAVIGATION</span>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => { onNavigate('playground'); setShowMobileDrawer(false); }}
+                style={{ justifyContent: 'flex-start', background: activePage === 'playground' ? 'var(--color-primary-light)' : 'transparent' }}
+              >
+                API Playground
+              </button>
+              {currentRole === 'CUSTOMER' && (
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => { onNavigate('catalog'); setShowMobileDrawer(false); }}
+                  style={{ justifyContent: 'flex-start', background: activePage === 'catalog' ? 'var(--color-primary-light)' : 'transparent' }}
+                >
+                  Products
+                </button>
+              )}
+              {currentRole === 'CUSTOMER' && (
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => { onNavigate('cart'); setShowMobileDrawer(false); }}
+                  style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <ShoppingCart size={16} />
+                  <span>Cart ({cartItemsCount})</span>
+                </button>
+              )}
+            </div>
+
+            {/* Persona switcher for Admin */}
+            {currentUser?.role === 'ADMIN' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>PERSONA</span>
+                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                  <button className="btn btn-secondary" onClick={() => { handleRoleChange('CUSTOMER'); setShowMobileDrawer(false); }} style={{ flex: 1, fontSize: '0.75rem', padding: '0.5rem', background: currentRole === 'CUSTOMER' ? 'var(--color-primary-light)' : 'transparent' }}>Cust</button>
+                  <button className="btn btn-secondary" onClick={() => { handleRoleChange('EMPLOYEE'); setShowMobileDrawer(false); }} style={{ flex: 1, fontSize: '0.75rem', padding: '0.5rem', background: currentRole === 'EMPLOYEE' ? 'var(--color-primary-light)' : 'transparent' }}>Emp</button>
+                  <button className="btn btn-secondary" onClick={() => { handleRoleChange('ADMIN'); setShowMobileDrawer(false); }} style={{ flex: 1, fontSize: '0.75rem', padding: '0.5rem', background: currentRole === 'ADMIN' ? 'var(--color-primary-light)' : 'transparent' }}>Admin</button>
+                </div>
+              </div>
+            )}
+
+            {/* Theme Toggle & Profile */}
+            <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn btn-secondary" onClick={toggleTheme} style={{ flex: 1, gap: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {theme === 'dark' ? <><Sun size={16} /> Light Mode</> : <><Moon size={16} /> Dark Mode</>}
+                </button>
+              </div>
+
+              {currentUser ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => { onNavigate(currentRole === 'CUSTOMER' ? 'profile' : 'admin-dashboard'); setShowMobileDrawer(false); }}
+                    style={{ gap: '0.5rem', width: '100%', display: 'flex', alignItems: 'center' }}
+                  >
+                    <UserIcon size={16} />
+                    <span>{currentUser.firstName} {currentUser.lastName}</span>
+                  </button>
+                  <button 
+                    className="btn btn-danger" 
+                    onClick={() => { setCurrentUser(null); setCurrentRole('CUSTOMER'); onNavigate('home'); setShowMobileDrawer(false); showNotification('Logged out successfully'); }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  >
+                    <LogOut size={16} />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              ) : (
+                <button className="btn btn-secondary" onClick={() => { setIsRegister(false); setShowLoginModal(true); setShowMobileDrawer(false); }} style={{ width: '100%', gap: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <UserIcon size={16} />
+                  <span>Login / Register</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* LOGIN / SIGNUP MODAL */}
       {showLoginModal && (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AppProvider, useApp, Product, apiRequest } from './context/AppContext';
+import { X, Settings } from 'lucide-react';
+import { AppProvider, useApp, Product, apiRequest, User } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { CustomerHome } from './pages/CustomerHome';
@@ -15,7 +16,7 @@ import { AdminReviews } from './pages/AdminReviews';
 import { ApiPlayground } from './pages/ApiPlayground';
 
 const AppContent: React.FC = () => {
-  const { currentUser, setCurrentUser, users, currentRole, setCurrentRole, toast, showNotification, registerUser } = useApp();
+  const { currentUser, setCurrentUser, currentRole, setCurrentRole, toast, showNotification, registerUser } = useApp();
   
   // Detect if url is /playground at initial load
   const initialPage = window.location.pathname === '/playground' ? 'playground' : 'home';
@@ -24,6 +25,7 @@ const AppContent: React.FC = () => {
   const [categoryParam, setCategoryParam] = useState<string>('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isRegister, setIsRegister] = useState(false);
+  const [showSidebarDrawer, setShowSidebarDrawer] = useState(false);
 
   // Sync activePage change to URL
   useEffect(() => {
@@ -177,7 +179,7 @@ const AppContent: React.FC = () => {
                 });
                 
                 const mappedUser: User = {
-                  userId: String(response.id),
+                  userId: `usr_${response.id}`,
                   email: response.email,
                   firstName: response.firstName,
                   lastName: response.lastName,
@@ -299,6 +301,49 @@ const AppContent: React.FC = () => {
           {renderPage()}
         </main>
       </div>
+
+      {/* Floating Toggle Button for Admin Sidebar (Mobile only) */}
+      {isAdminView && (currentRole === 'ADMIN' || currentRole === 'EMPLOYEE') && (
+        <button 
+          className="nav-mobile-only btn btn-primary btn-icon" 
+          onClick={() => setShowSidebarDrawer(true)}
+          style={{ 
+            position: 'fixed', 
+            bottom: '2rem', 
+            left: '2rem', 
+            zIndex: 500, 
+            boxShadow: 'var(--shadow-lg)', 
+            width: '50px', 
+            height: '50px', 
+            borderRadius: '50%',
+            display: 'none',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          title="Open Control Panel Navigation"
+        >
+          <Settings size={24} />
+        </button>
+      )}
+
+      {/* MOBILE SIDEBAR DRAWER */}
+      {showSidebarDrawer && isAdminView && (currentRole === 'ADMIN' || currentRole === 'EMPLOYEE') && (
+        <>
+          <div className="mobile-drawer-backdrop" onClick={() => setShowSidebarDrawer(false)} style={{ zIndex: 998 }} />
+          <div className="mobile-drawer" style={{ left: 0, right: 'auto', borderRight: '1px solid var(--border-color)', borderLeft: 'none', zIndex: 999 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0, color: 'var(--color-accent)' }}>Control Panel</h3>
+              <button className="btn btn-secondary btn-icon" onClick={() => setShowSidebarDrawer(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            {/* Sidebar content */}
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }} onClick={() => setShowSidebarDrawer(false)}>
+              <Sidebar onNavigate={navigate} activePage={activePage} />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Footer */}
       <footer style={{ marginTop: 'auto', padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', fontSize: '0.85rem' }}>

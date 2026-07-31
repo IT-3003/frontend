@@ -130,7 +130,7 @@ interface AppContextType {
   // 1. User Management
   users: User[];
   registerUser: (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string; address?: string }) => Promise<User>;
-  updateUser: (userId: string, updates: Partial<User>) => Promise<void>;
+  updateUser: (userId: string, updates: Partial<User> & { password?: string }) => Promise<void>;
   deactivateUser: (userId: string) => Promise<void>;
 
   // 2. Branch Management
@@ -491,10 +491,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- API ASYNC SYNC ON LOAD ---
   useEffect(() => {
     const loadRealData = async () => {
+      let mappedUsersList: User[] = [];
       try {
         const backendUsers = await apiRequest('/user');
         if (Array.isArray(backendUsers)) {
-          const mappedUsers = backendUsers.map((bu: any) => ({
+          mappedUsersList = backendUsers.map((bu: any) => ({
             userId: `usr_${bu.id}`,
             email: bu.email,
             firstName: bu.firstName,
@@ -510,7 +511,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               isDefault: true
             }] : []
           }));
-          setUsers(mappedUsers);
+          setUsers(mappedUsersList);
         }
       } catch (e) {
         console.warn("Failed to fetch users from backend:", e);
@@ -585,16 +586,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const backendReviews = await apiRequest('/reviews');
         if (Array.isArray(backendReviews)) {
-          const mappedReviews = backendReviews.map((br: any) => ({
-            reviewId: `rev_${br.reviewId}`,
-            userId: `usr_${br.userId}`,
-            itemId: `item_${br.itemId}`,
-            userName: `User ${br.userId}`,
-            rating: br.rating,
-            comment: br.comment,
-            isFlagged: false,
-            createdAt: new Date().toISOString()
-          }));
+          const mappedReviews = backendReviews.map((br: any) => {
+            const userObj = mappedUsersList.find(u => u.userId === `usr_${br.userId}`);
+            return {
+              reviewId: `rev_${br.reviewId}`,
+              userId: `usr_${br.userId}`,
+              itemId: `item_${br.itemId}`,
+              userName: userObj ? `${userObj.firstName} ${userObj.lastName}` : `User ${br.userId}`,
+              rating: br.rating,
+              comment: br.comment,
+              isFlagged: false,
+              createdAt: new Date().toISOString()
+            };
+          });
           setReviews(mappedReviews);
         }
       } catch (e) {
@@ -621,32 +625,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const backendOrders = await apiRequest('/order');
         if (Array.isArray(backendOrders)) {
-          const mappedOrders = backendOrders.map((bo: any) => ({
-            orderId: `ord_${bo.orderId}`,
-            userId: `usr_${bo.userId}`,
-            userName: `Customer ${bo.userId}`,
-            branchId: `br_${bo.branchId}`,
-            branchName: `Branch ${bo.branchId}`,
-            items: Array.isArray(bo.orderItems) ? bo.orderItems.map((oi: any) => ({
-              itemId: `item_${oi.productId}`,
-              name: oi.productName || `Product ${oi.productId}`,
-              price: oi.unitPrice,
-              quantity: oi.quantity
-            })) : [],
-            subtotal: bo.subtotal,
-            discount: bo.discountAmount,
-            deliveryFee: bo.deliveryAddress ? 3.99 : 0,
-            total: bo.totalAmount,
-            status: (bo.status || 'PROCESSING') as Order['status'],
-            deliveryAddress: bo.deliveryAddress ? {
-              id: `addr_${bo.orderId}`,
-              street: bo.deliveryAddress,
-              city: 'Colombo',
-              zipCode: '00100',
-              isDefault: false
-            } : null,
-            createdAt: bo.orderDate || new Date().toISOString()
-          }));
+          const mappedOrders = backendOrders.map((bo: any) => {
+            const orderUserId = bo.user ? bo.user.id : bo.userId;
+            const orderBranchId = bo.branch ? bo.branch.branchId : bo.branchId;
+            const userObj = mappedUsersList.find(u => u.userId === `usr_${orderUserId}`);
+            return {
+              orderId: `ord_${bo.orderId}`,
+              userId: `usr_${orderUserId}`,
+              userName: userObj ? `${userObj.firstName} ${userObj.lastName}` : `Customer ${orderUserId}`,
+              branchId: `br_${orderBranchId}`,
+              branchName: bo.branch ? bo.branch.branchName : `Branch ${orderBranchId}`,
+              items: Array.isArray(bo.orderItems) ? bo.orderItems.map((oi: any) => ({
+                itemId: `item_${oi.productId}`,
+                name: oi.productName || `Product ${oi.productId}`,
+                price: oi.unitPrice,
+                quantity: oi.quantity
+              })) : [],
+              subtotal: bo.subtotal,
+              discount: bo.discountAmount,
+              deliveryFee: bo.deliveryAddress ? 3.99 : 0,
+              total: bo.totalAmount,
+              status: (bo.status || 'PROCESSING') as Order['status'],
+              deliveryAddress: bo.deliveryAddress ? {
+                id: `addr_${bo.orderId}`,
+                street: bo.deliveryAddress,
+                city: 'Colombo',
+                zipCode: '00100',
+                isDefault: false
+              } : null,
+              createdAt: bo.orderDate || new Date().toISOString()
+            };
+          });
           setOrders(mappedOrders);
         }
       } catch (e) {
@@ -771,7 +780,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify(backendUserPayload)
       });
       const mappedUser: User = {
-        userId: String(response.id),
+        userId: `usr_${response.id}`,
         email: response.email,
         firstName: response.firstName,
         lastName: response.lastName,
@@ -809,21 +818,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateUser = async (userId: string, updates: Partial<User>) => {
+  const updateUser = async (userId: string, updates: Partial<User> & { password?: string }) => {
+    const existing = users.find((u) => u.userId === userId);
+    if (!existing) return;
+
+    const backendUserPayload = {
+      id: toNumericId(userId),
+      firstName: updates.firstName !== undefined ? updates.firstName : existing.firstName,
+      lastName: updates.lastName !== undefined ? updates.lastName : existing.lastName,
+      email: existing.email,
+      phoneNumber: updates.phone !== undefined ? updates.phone : existing.phone,
+      role: existing.role === 'EMPLOYEE' ? 'STAFF' : existing.role,
+      active: existing.status === 'ACTIVE',
+      type: existing.role === 'ADMIN' ? 'admin' : (existing.role === 'EMPLOYEE' ? 'staff' : 'customer'),
+      address: existing.addresses[0]?.street || '',
+      password: updates.password || null
+    };
+
     try {
       const numericId = toNumericId(userId);
       await apiRequest(`/user/${numericId}`, {
         method: 'PUT',
-        body: JSON.stringify(updates)
+        body: JSON.stringify(backendUserPayload)
       });
     } catch (e) {
       console.warn("Backend API profile update failed, modifying local state only:", e);
     }
+
+    const localUpdates = {
+      firstName: backendUserPayload.firstName,
+      lastName: backendUserPayload.lastName,
+      phone: backendUserPayload.phoneNumber
+    };
+
     setUsers((prev) =>
-      prev.map((u) => (u.userId === userId ? { ...u, ...updates } : u))
+      prev.map((u) => (u.userId === userId ? { ...u, ...localUpdates } : u))
     );
     if (currentUser?.userId === userId) {
-      setCurrentUser((prev) => (prev ? { ...prev, ...updates } : null));
+      setCurrentUser((prev) => (prev ? { ...prev, ...localUpdates } : null));
     }
     showNotification('Profile updated successfully', 'success');
   };

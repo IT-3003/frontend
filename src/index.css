@@ -299,3 +299,123 @@ h3 { font-size: 1.4rem; }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-accent);
 }
+
+/* Header and Desktop Navbar classes */
+.app-header {
+  margin: 1rem;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 1rem;
+  z-index: 100;
+}
+
+.nav-desktop-only {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* Hero Carousel Layout */
+.hero-carousel {
+  height: 400px;
+}
+
+.hero-slide-content {
+  padding: 4rem;
+}
+
+.hero-slide-title {
+  font-size: 3rem;
+}
+
+/* Mobile Responsiveness Styles */
+@media (max-width: 1024px) {
+  .main-content {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    margin: 0.5rem;
+    padding: 0.75rem 1.25rem;
+  }
+
+  .main-content {
+    padding: 1rem;
+  }
+
+  .hero-carousel {
+    height: 280px;
+  }
+
+  .hero-slide-content {
+    padding: 2rem 1.5rem;
+  }
+
+  .hero-slide-title {
+    font-size: 1.8rem;
+  }
+
+  /* Hide desktop-only elements */
+  .nav-desktop-only {
+    display: none !important;
+  }
+
+  /* Show mobile-only elements */
+  .nav-mobile-only {
+    display: flex !important;
+  }
+
+  /* Mobile drawer navigation */
+  .mobile-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 280px;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .mobile-drawer-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+  }
+
+  /* Override Sidebar styles when inside mobile-drawer container */
+  .mobile-drawer aside.glass-panel {
+    display: flex !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+
