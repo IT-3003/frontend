@@ -14,13 +14,21 @@ import { AdminOrders } from './pages/AdminOrders';
 import { AdminPromotions } from './pages/AdminPromotions';
 import { AdminReviews } from './pages/AdminReviews';
 import { ApiPlayground } from './pages/ApiPlayground';
+import { CustomerDeals } from './pages/CustomerDeals';
 
 const AppContent: React.FC = () => {
   const { currentUser, setCurrentUser, currentRole, setCurrentRole, toast, showNotification, registerUser } = useApp();
   
-  // Detect if url is /playground at initial load
-  const initialPage = window.location.pathname === '/playground' ? 'playground' : 'home';
-  const [activePage, setActivePage] = useState<string>(initialPage);
+  // Detect if url contains profile or stripe parameters at initial load
+  const getInitialPage = () => {
+    if (window.location.pathname === '/playground') return 'playground';
+    const params = new URLSearchParams(window.location.search);
+    if (window.location.pathname === '/profile' || params.has('session_id')) {
+      return 'profile';
+    }
+    return 'home';
+  };
+  const [activePage, setActivePage] = useState<string>(getInitialPage());
   const [searchParam, setSearchParam] = useState<string>('');
   const [categoryParam, setCategoryParam] = useState<string>('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -32,7 +40,9 @@ const AppContent: React.FC = () => {
     const handleLocationChange = () => {
       if (window.location.pathname === '/playground') {
         setActivePage('playground');
-      } else if (activePage === 'playground') {
+      } else if (window.location.pathname === '/profile') {
+        setActivePage('profile');
+      } else if (activePage === 'playground' || activePage === 'profile') {
         setActivePage('home');
       }
     };
@@ -46,8 +56,12 @@ const AppContent: React.FC = () => {
       window.history.pushState({}, '', '/playground');
       setActivePage('playground');
       return;
+    } else if (page === 'profile') {
+      window.history.pushState({}, '', '/profile');
+      setActivePage('profile');
+      return;
     } else {
-      if (window.location.pathname === '/playground') {
+      if (window.location.pathname === '/playground' || window.location.pathname === '/profile') {
         window.history.pushState({}, '', '/');
       }
     }
@@ -95,6 +109,8 @@ const AppContent: React.FC = () => {
         );
       case 'cart':
         return <CartCheckout onNavigate={navigate} />;
+      case 'deals':
+        return <CustomerDeals onNavigate={navigate} />;
       case 'profile':
         return <UserProfile onNavigate={navigate} />;
 

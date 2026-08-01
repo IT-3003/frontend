@@ -162,18 +162,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
             )}
           </div>
 
-          {/* API Playground Link */}
-          <button 
-            className="btn" 
-            onClick={() => onNavigate('playground')} 
-            style={{ 
-              background: 'transparent', 
-              color: activePage === 'playground' ? 'var(--color-accent)' : 'var(--text-primary)', 
-              fontWeight: activePage === 'playground' ? 'bold' : 'normal' 
-            }}
-          >
-            API Playground
-          </button>
 
           {/* Customer Specific Links */}
           {currentRole === 'CUSTOMER' && (
@@ -188,6 +176,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
                 }}
               >
                 Products
+              </button>
+              <button 
+                className="btn" 
+                onClick={() => onNavigate('deals')} 
+                style={{ 
+                  background: 'transparent', 
+                  color: activePage === 'deals' ? 'var(--color-accent)' : 'var(--text-primary)', 
+                  fontWeight: activePage === 'deals' ? 'bold' : 'normal' 
+                }}
+              >
+                Deals & Offers
               </button>
             </>
           )}
@@ -339,13 +338,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
             {/* Links */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>NAVIGATION</span>
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => { onNavigate('playground'); setShowMobileDrawer(false); }}
-                style={{ justifyContent: 'flex-start', background: activePage === 'playground' ? 'var(--color-primary-light)' : 'transparent' }}
-              >
-                API Playground
-              </button>
               {currentRole === 'CUSTOMER' && (
                 <button 
                   className="btn btn-secondary" 
@@ -353,6 +345,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
                   style={{ justifyContent: 'flex-start', background: activePage === 'catalog' ? 'var(--color-primary-light)' : 'transparent' }}
                 >
                   Products
+                </button>
+              )}
+              {currentRole === 'CUSTOMER' && (
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => { onNavigate('deals'); setShowMobileDrawer(false); }}
+                  style={{ justifyContent: 'flex-start', background: activePage === 'deals' ? 'var(--color-primary-light)' : 'transparent' }}
+                >
+                  Deals & Offers
                 </button>
               )}
               {currentRole === 'CUSTOMER' && (

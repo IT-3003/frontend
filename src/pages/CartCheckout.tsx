@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp, Address } from '../context/AppContext';
+import { useApp, Address, apiRequest } from '../context/AppContext';
 import { Trash2, ShoppingBag, Plus, Minus, Tag, CreditCard, Milestone, ShieldCheck } from 'lucide-react';
 
 interface CartCheckoutProps {
@@ -74,6 +74,11 @@ export const CartCheckout: React.FC<CartCheckoutProps> = ({ onNavigate }) => {
   const deliveryFee = isDelivery ? 3.99 : 0;
   const total = Number((subtotal - discount + deliveryFee).toFixed(2));
 
+  const toNumericId = (id: string): number => {
+    const num = parseInt(id.replace(/\D/g, ''), 10);
+    return isNaN(num) ? 1 : num;
+  };
+
   const handleCheckout = async () => {
     if (!currentUser) {
       showNotification('Please login to place an order', 'error');
@@ -109,6 +114,32 @@ export const CartCheckout: React.FC<CartCheckoutProps> = ({ onNavigate }) => {
       
       setCreatedOrder(order);
       setCreatedPayment(payment);
+      clearCart(); // Empty the cart immediately upon successful placement of the order
+
+      if (paymentMethod === 'CREDIT_CARD') {
+        try {
+          showNotification('Connecting to Stripe Test Mode...', 'info');
+          // Call backend Stripe Checkout Session endpoint
+          const session = await apiRequest('/payment/stripe-session', {
+            method: 'POST',
+            body: JSON.stringify({
+              orderId: toNumericId(order.orderId),
+              amount: total
+            })
+          });
+          
+          if (session && session.url) {
+            showNotification('Redirecting to Stripe Checkout...', 'success');
+            window.location.href = session.url;
+            return;
+          }
+          throw new Error('Invalid session response from backend');
+        } catch (stripeError) {
+          console.warn("Backend Stripe session creation failed. Falling back to simulation mode:", stripeError);
+          showNotification('Stripe backend offline. Simulating Stripe Test Mode...', 'info');
+          // Fall back to simulation below
+        }
+      }
 
       // Simulate payment gateway delay
       setTimeout(async () => {
@@ -116,9 +147,11 @@ export const CartCheckout: React.FC<CartCheckoutProps> = ({ onNavigate }) => {
         
         if (paymentSuccess) {
           await updatePaymentStatus(payment.transactionId, 'COMPLETED');
+          setCreatedPayment((prev: any) => prev ? { ...prev, status: 'COMPLETED' } : null);
           showNotification('Payment verified! Order placed successfully.', 'success');
         } else {
           await updatePaymentStatus(payment.transactionId, 'FAILED');
+          setCreatedPayment((prev: any) => prev ? { ...prev, status: 'FAILED' } : null);
           showNotification('Payment transaction failed. Please review your credentials.', 'error');
         }
         setIsProcessing(false);
@@ -361,7 +394,7 @@ export const CartCheckout: React.FC<CartCheckoutProps> = ({ onNavigate }) => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label className="btn" style={{ justifyContent: 'flex-start', background: paymentMethod === 'CREDIT_CARD' ? 'var(--color-primary-light)' : 'var(--bg-input)', border: '1px solid var(--border-color)', cursor: 'pointer' }}>
                   <input type="radio" name="paymethod" checked={paymentMethod === 'CREDIT_CARD'} onChange={() => setPaymentMethod('CREDIT_CARD')} style={{ marginRight: '0.75rem' }} />
-                  <CreditCard size={18} style={{ marginRight: '0.5rem' }} /> Credit Card (Simulate Gateway)
+                  <CreditCard size={18} style={{ marginRight: '0.5rem' }} /> Credit Card (Stripe Test Mode)
                 </label>
                 <label className="btn" style={{ justifyContent: 'flex-start', background: paymentMethod === 'DEBIT_CARD' ? 'var(--color-primary-light)' : 'var(--bg-input)', border: '1px solid var(--border-color)', cursor: 'pointer' }}>
                   <input type="radio" name="paymethod" checked={paymentMethod === 'DEBIT_CARD'} onChange={() => setPaymentMethod('DEBIT_CARD')} style={{ marginRight: '0.75rem' }} />

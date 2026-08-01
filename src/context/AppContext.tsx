@@ -466,7 +466,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    const saved = localStorage.getItem('fc_cart');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [activeCoupon, setActiveCoupon] = useState<Promotion | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -478,6 +481,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { localStorage.setItem('fc_reviews', JSON.stringify(reviews)); }, [reviews]);
   useEffect(() => { localStorage.setItem('fc_payments', JSON.stringify(payments)); }, [payments]);
   useEffect(() => { localStorage.setItem('fc_orders', JSON.stringify(orders)); }, [orders]);
+  useEffect(() => { localStorage.setItem('fc_cart', JSON.stringify(cart)); }, [cart]);
   useEffect(() => {
     if (currentUser) localStorage.setItem('fc_current_user', JSON.stringify(currentUser));
     else localStorage.removeItem('fc_current_user');
@@ -609,11 +613,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const backendPayments = await apiRequest('/payment/all');
         if (Array.isArray(backendPayments)) {
           const mappedPayments = backendPayments.map((bp: any) => ({
-            transactionId: `tx_${bp.paymentId}`,
-            orderId: `ord_${bp.orderId}`,
+            transactionId: bp.transaction || `tx_${bp.paymentId}`,
+            orderId: `ord_${bp.order ? bp.order.orderId : (bp.orderId || '')}`,
             amount: bp.amount,
             paymentMethod: bp.paymentMethod || 'CASH_ON_DELIVERY',
-            status: bp.status || 'COMPLETED',
+            status: bp.paymentStatus === 'SUCCESS' ? 'COMPLETED' : (bp.paymentStatus === 'FAILED' ? 'FAILED' : 'PENDING'),
             createdAt: bp.paymentDate || new Date().toISOString()
           }));
           setPayments(mappedPayments);
@@ -1064,7 +1068,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     else if (method === 'MOBILE_WALLET') backendMethod = 'PAYPAL';
 
     const backendPaymentPayload = {
-      paymentId: numericPaymentId,
       order: { orderId: toNumericId(orderId) },
       user: { 
         id: currentUser ? toNumericId(currentUser.userId) : 1,
@@ -1073,7 +1076,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       amount: amount,
       paymentMethod: backendMethod,
       transaction: 'tx_' + numericPaymentId,
-      paymentStatus: 'SUCCESS',
+      paymentStatus: method === 'CREDIT_CARD' ? 'PENDING' : 'SUCCESS',
       paymentDate: new Date().toISOString(),
       isActive: true
     };

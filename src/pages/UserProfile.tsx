@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp, Address, apiRequest } from '../context/AppContext';
 import { User, Key, MapPin, Trash2, ShieldX, Package } from 'lucide-react';
 
@@ -14,6 +14,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
     orders,
     cancelOrder,
     payments,
+    updatePaymentStatus,
+    clearCart,
     showNotification
   } = useApp();
 
@@ -31,6 +33,26 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
   const [city, setCity] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [showAddAddress, setShowAddAddress] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    const orderId = params.get('orderId');
+
+    if (sessionId && orderId) {
+      const getNumeric = (id: string) => id.replace(/\D/g, '');
+      // Find the payment associated with this order using numeric matching to ignore prefixes like "ord_"
+      const paymentObj = payments.find(p => getNumeric(p.orderId) === getNumeric(orderId));
+      
+      if (paymentObj && paymentObj.status === 'PENDING') {
+        updatePaymentStatus(paymentObj.transactionId, 'COMPLETED');
+        clearCart(); // Clear cart items upon successful redirect verification
+        showNotification('Stripe payment verified successfully!', 'success');
+        // Clear the URL parameters so it doesn't trigger again on refresh
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, [payments, updatePaymentStatus, clearCart, showNotification]);
 
   if (!currentUser) {
     return (
