@@ -497,7 +497,7 @@ export const ApiPlayground: React.FC = () => {
     <div className="main-content" style={{ padding: '2rem 1rem', maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-accent)' }}>
-          🔌 Backend API Playground
+          <Database size={24} /> Backend API Playground
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
           Directly execute and test the Spring Boot REST endpoints from the React frontend in real-time.

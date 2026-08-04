@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings } from 'lucide-react';
+import { X, Settings, ShoppingBag } from 'lucide-react';
 import { AppProvider, useApp, Product, apiRequest, User } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -17,7 +17,7 @@ import { ApiPlayground } from './pages/ApiPlayground';
 import { CustomerDeals } from './pages/CustomerDeals';
 
 const AppContent: React.FC = () => {
-  const { currentUser, setCurrentUser, currentRole, setCurrentRole, toast, showNotification, registerUser } = useApp();
+  const { currentUser, setCurrentUser, currentRole, setCurrentRole, toast, showNotification, registerUser, showLoginModal, setShowLoginModal } = useApp();
   
   // Detect if url contains profile or stripe parameters at initial load
   const getInitialPage = () => {
@@ -34,6 +34,7 @@ const AppContent: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isRegister, setIsRegister] = useState(false);
   const [showSidebarDrawer, setShowSidebarDrawer] = useState(false);
+  const isAdminView = activePage.startsWith('admin-');
 
   // Sync activePage change to URL
   useEffect(() => {
@@ -50,6 +51,14 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('popstate', handleLocationChange);
   }, [activePage]);
 
+  // Redirect unauthenticated guests from admin pages
+  useEffect(() => {
+    if (isAdminView && !currentUser) {
+      navigate('home');
+      setShowLoginModal(true);
+    }
+  }, [activePage, currentUser, isAdminView]);
+
   // Parse path simulated URL hashes or simple routing triggers
   const navigate = (page: string) => {
     if (page === 'playground') {
@@ -57,8 +66,19 @@ const AppContent: React.FC = () => {
       setActivePage('playground');
       return;
     } else if (page === 'profile') {
+      if (!currentUser) {
+        setShowLoginModal(true);
+        return;
+      }
       window.history.pushState({}, '', '/profile');
       setActivePage('profile');
+      return;
+    } else if (page === 'cart') {
+      if (!currentUser) {
+        setShowLoginModal(true);
+        return;
+      }
+      setActivePage('cart');
       return;
     } else {
       if (window.location.pathname === '/playground' || window.location.pathname === '/profile') {
@@ -133,165 +153,170 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const isAdminView = activePage.startsWith('admin-');
-
-  // Conditional early return ONLY after all Hooks are registered
-  if (!currentUser) {
-    return (
-      <div className="app-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'radial-gradient(circle at top right, #1f2937, #111827)' }}>
-        {toast && (
-          <div className="toast-container">
-            <div className={`toast toast-${toast.type}`}>
-              <span>{toast.message}</span>
-            </div>
-          </div>
-        )}
-        <div className="glass-panel" style={{ width: '420px', padding: '3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div>
-            <span style={{ fontSize: '3rem' }}>🛒</span>
-            <h2 style={{ margin: '0.5rem 0 0 0', fontSize: '1.8rem', fontWeight: 800, color: 'var(--color-accent)' }}>FreshCart</h2>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              {isRegister ? 'Create your new customer account' : 'Sign in to access the supermarket portal'}
-            </p>
-          </div>
-          <form onSubmit={async (e) => {
-            e.preventDefault();
-            const target = e.target as any;
-            const emailInput = target.email.value;
-            
-            if (isRegister) {
-              const fName = target.firstName.value;
-              const lName = target.lastName.value;
-              const pNo = target.phone.value;
-              const addr = target.address.value;
-              const pwd = target.password.value;
-              
-              try {
-                const newUser = await registerUser({
-                  email: emailInput,
-                  firstName: fName,
-                  lastName: lName,
-                  phone: pNo,
-                  role: 'CUSTOMER',
-                  address: addr,
-                  password: pwd
-                });
-                
-                if (newUser) {
-                  setCurrentUser(newUser);
-                  setCurrentRole(newUser.role);
-                  showNotification(`Welcome, ${newUser.firstName}!`, 'success');
-                  navigate('home');
-                }
-              } catch (err: any) {
-                showNotification(err.message || 'Registration failed', 'error');
-              }
-            } else {
-              const passwordInput = target.password.value;
-              try {
-                const response = await apiRequest('/user/login', {
-                  method: 'POST',
-                  body: JSON.stringify({ email: emailInput, password: passwordInput })
-                });
-                
-                const mappedUser: User = {
-                  userId: `usr_${response.id}`,
-                  email: response.email,
-                  firstName: response.firstName,
-                  lastName: response.lastName,
-                  phone: response.phoneNumber || response.phone || '',
-                  role: response.role === 'STAFF' ? 'EMPLOYEE' : response.role,
-                  status: response.active ? 'ACTIVE' : 'INACTIVE',
-                  addresses: response.address ? [{
-                    id: `addr_${response.id}`,
-                    street: response.address,
-                    city: 'Colombo',
-                    zipCode: '00100',
-                    isDefault: true
-                  }] : []
-                };
-
-                if (mappedUser.status === 'INACTIVE') {
-                  showNotification('This account is deactivated', 'error');
-                  return;
-                }
-
-                setCurrentUser(mappedUser);
-                setCurrentRole(mappedUser.role);
-                showNotification(`Welcome back, ${mappedUser.firstName}!`, 'success');
-                navigate(mappedUser.role === 'ADMIN' || mappedUser.role === 'EMPLOYEE' ? 'admin-dashboard' : 'home');
-              } catch (err: any) {
-                showNotification('Invalid credentials. Check email or password.', 'error');
-              }
-            }
-          }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Email Address</label>
-              <input type="email" name="email" required placeholder="name@freshcart.com" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Password</label>
-              <input type="password" name="password" required placeholder="••••••••" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
-            </div>
-
-            {isRegister && (
-              <>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>First Name</label>
-                    <input type="text" name="firstName" required placeholder="John" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Last Name</label>
-                    <input type="text" name="lastName" required placeholder="Doe" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Phone Number</label>
-                  <input type="text" name="phone" required placeholder="0771234567" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Delivery Address</label>
-                  <input type="text" name="address" required placeholder="No 12, Galle Road, Colombo" className="btn" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', justifyContent: 'flex-start', cursor: 'text' }} />
-                </div>
-              </>
-            )}
-
-            <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem', marginTop: '0.5rem' }}>
-              {isRegister ? 'Create Account' : 'Sign In'}
-            </button>
-          </form>
-
-          <div style={{ fontSize: '0.85rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>
-              {isRegister ? 'Already have an account? ' : 'New to FreshCart? '}
-            </span>
-            <button 
-              className="btn" 
-              onClick={() => setIsRegister(!isRegister)} 
-              style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--color-accent)', fontWeight: 'bold', display: 'inline', cursor: 'pointer' }}
-            >
-              {isRegister ? 'Sign In' : 'Sign Up'}
-            </button>
-          </div>
-
-          {!isRegister && (
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Available credentials:<br/>
-              Admin: <code>admin@freshcart.com</code><br/>
-              Customer: <code>john.doe@example.com</code>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="app-container">
+      {/* Login Modal Overlay */}
+      {showLoginModal && (
+        <div className="modal-backdrop" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(11, 19, 14, 0.75)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div className="glass-panel scale-in" style={{ width: '420px', padding: '2.5rem', position: 'relative', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'center' }}>
+            <button 
+              onClick={() => setShowLoginModal(false)}
+              className="btn btn-secondary btn-icon"
+              style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', padding: '0.25rem', minWidth: 'auto', minHeight: 'auto', cursor: 'pointer' }}
+              title="Close Sign In Dialog"
+            >
+              <X size={20} />
+            </button>
+            <div>
+              <div style={{ color: 'var(--color-accent)', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                <ShoppingBag size={48} />
+              </div>
+              <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, color: 'var(--color-accent)' }}>FreshCart</h2>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {isRegister ? 'Create your new customer account' : 'Sign in to access the supermarket portal'}
+              </p>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const target = e.target as any;
+              const emailInput = target.email.value;
+              
+              if (isRegister) {
+                const fName = target.firstName.value;
+                const lName = target.lastName.value;
+                const pNo = target.phone.value;
+                const addr = target.address.value;
+                const pwd = target.password.value;
+                
+                try {
+                  const newUser = await registerUser({
+                    email: emailInput,
+                    firstName: fName,
+                    lastName: lName,
+                    phone: pNo,
+                    role: 'CUSTOMER',
+                    address: addr,
+                    password: pwd
+                  });
+                  
+                  if (newUser) {
+                    setCurrentUser(newUser);
+                    setCurrentRole(newUser.role);
+                    showNotification(`Welcome, ${newUser.firstName}!`, 'success');
+                    setShowLoginModal(false);
+                    navigate('home');
+                  }
+                } catch (err: any) {
+                  showNotification(err.message || 'Registration failed', 'error');
+                }
+              } else {
+                const passwordInput = target.password.value;
+                try {
+                  const response = await apiRequest('/user/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ email: emailInput, password: passwordInput })
+                  });
+                  
+                  const mappedUser: User = {
+                    userId: `usr_${response.id}`,
+                    email: response.email,
+                    firstName: response.firstName,
+                    lastName: response.lastName,
+                    phone: response.phoneNumber || response.phone || '',
+                    role: response.role === 'STAFF' ? 'EMPLOYEE' : response.role,
+                    status: response.active ? 'ACTIVE' : 'INACTIVE',
+                    addresses: response.address ? [{
+                      id: `addr_${response.id}`,
+                      street: response.address,
+                      city: 'Colombo',
+                      zipCode: '00100',
+                      isDefault: true
+                    }] : []
+                  };
+
+                  if (mappedUser.status === 'INACTIVE') {
+                    showNotification('This account is deactivated', 'error');
+                    return;
+                  }
+
+                  setCurrentUser(mappedUser);
+                  setCurrentRole(mappedUser.role);
+                  showNotification(`Welcome back, ${mappedUser.firstName}!`, 'success');
+                  setShowLoginModal(false);
+                  navigate(mappedUser.role === 'ADMIN' || mappedUser.role === 'EMPLOYEE' ? 'admin-dashboard' : 'home');
+                } catch (err: any) {
+                  showNotification('Invalid credentials. Check email or password.', 'error');
+                }
+              }
+            }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Email Address</label>
+                <input type="email" name="email" required placeholder="name@freshcart.com" className="form-input" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', borderRadius: 'var(--border-radius-sm)', outline: 'none' }} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Password</label>
+                <input type="password" name="password" required placeholder="••••••••" className="form-input" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', borderRadius: 'var(--border-radius-sm)', outline: 'none' }} />
+              </div>
+
+              {isRegister && (
+                <>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>First Name</label>
+                      <input type="text" name="firstName" required placeholder="John" className="form-input" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', borderRadius: 'var(--border-radius-sm)', outline: 'none' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Last Name</label>
+                      <input type="text" name="lastName" required placeholder="Doe" className="form-input" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', borderRadius: 'var(--border-radius-sm)', outline: 'none' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Phone Number</label>
+                    <input type="text" name="phone" required placeholder="0771234567" className="form-input" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', borderRadius: 'var(--border-radius-sm)', outline: 'none' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Delivery Address</label>
+                    <input type="text" name="address" required placeholder="No 12, Galle Road, Colombo" className="form-input" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.75rem', borderRadius: 'var(--border-radius-sm)', outline: 'none' }} />
+                  </div>
+                </>
+              )}
+
+              <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                {isRegister ? 'Create Account' : 'Sign In'}
+              </button>
+            </form>
+
+            <div style={{ fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-muted)' }}>
+                {isRegister ? 'Already have an account? ' : 'New to FreshCart? '}
+              </span>
+              <button 
+                className="btn" 
+                onClick={() => setIsRegister(!isRegister)} 
+                style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--color-accent)', fontWeight: 'bold', display: 'inline', cursor: 'pointer' }}
+              >
+                {isRegister ? 'Sign In' : 'Sign Up'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
       {/* Toast Alert Banner */}
       {toast && (
         <div className="toast-container">

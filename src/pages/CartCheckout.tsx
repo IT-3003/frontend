@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp, Address, apiRequest } from '../context/AppContext';
-import { Trash2, ShoppingBag, Plus, Minus, Tag, CreditCard, Milestone, ShieldCheck } from 'lucide-react';
+import { Trash2, ShoppingBag, Plus, Minus, Tag, CreditCard, Milestone, ShieldCheck, Receipt } from 'lucide-react';
 
 interface CartCheckoutProps {
   onNavigate: (page: string) => void;
@@ -118,7 +118,7 @@ export const CartCheckout: React.FC<CartCheckoutProps> = ({ onNavigate }) => {
 
       if (paymentMethod === 'CREDIT_CARD') {
         try {
-          showNotification('Connecting to Stripe Test Mode...', 'info');
+          showNotification('Connecting to payment gateway...', 'info');
           // Call backend Stripe Checkout Session endpoint
           const session = await apiRequest('/payment/stripe-session', {
             method: 'POST',
@@ -136,7 +136,7 @@ export const CartCheckout: React.FC<CartCheckoutProps> = ({ onNavigate }) => {
           throw new Error('Invalid session response from backend');
         } catch (stripeError) {
           console.warn("Backend Stripe session creation failed. Falling back to simulation mode:", stripeError);
-          showNotification('Stripe backend offline. Simulating Stripe Test Mode...', 'info');
+          showNotification('Stripe backend offline. Simulating payment...', 'info');
           // Fall back to simulation below
         }
       }
@@ -174,7 +174,9 @@ export const CartCheckout: React.FC<CartCheckoutProps> = ({ onNavigate }) => {
         
         {/* Receipt Header */}
         <div style={{ textAlign: 'center', borderBottom: '2px dashed var(--border-color)', paddingBottom: '1.5rem' }}>
-          <span style={{ fontSize: '3rem' }}>🧾</span>
+          <div style={{ color: 'var(--color-accent)', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+            <Receipt size={48} />
+          </div>
           <h2 style={{ color: 'var(--color-accent)' }}>Transaction Receipt</h2>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Transaction ID: {createdPayment.transactionId}</span>
           <br />
@@ -394,11 +396,7 @@ export const CartCheckout: React.FC<CartCheckoutProps> = ({ onNavigate }) => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label className="btn" style={{ justifyContent: 'flex-start', background: paymentMethod === 'CREDIT_CARD' ? 'var(--color-primary-light)' : 'var(--bg-input)', border: '1px solid var(--border-color)', cursor: 'pointer' }}>
                   <input type="radio" name="paymethod" checked={paymentMethod === 'CREDIT_CARD'} onChange={() => setPaymentMethod('CREDIT_CARD')} style={{ marginRight: '0.75rem' }} />
-                  <CreditCard size={18} style={{ marginRight: '0.5rem' }} /> Credit Card (Stripe Test Mode)
-                </label>
-                <label className="btn" style={{ justifyContent: 'flex-start', background: paymentMethod === 'DEBIT_CARD' ? 'var(--color-primary-light)' : 'var(--bg-input)', border: '1px solid var(--border-color)', cursor: 'pointer' }}>
-                  <input type="radio" name="paymethod" checked={paymentMethod === 'DEBIT_CARD'} onChange={() => setPaymentMethod('DEBIT_CARD')} style={{ marginRight: '0.75rem' }} />
-                  <CreditCard size={18} style={{ marginRight: '0.5rem' }} /> Debit Card (Simulate Failure)
+                  <CreditCard size={18} style={{ marginRight: '0.5rem' }} /> Card Payment
                 </label>
                 <label className="btn" style={{ justifyContent: 'flex-start', background: paymentMethod === 'CASH_ON_DELIVERY' ? 'var(--color-primary-light)' : 'var(--bg-input)', border: '1px solid var(--border-color)', cursor: 'pointer' }}>
                   <input type="radio" name="paymethod" checked={paymentMethod === 'CASH_ON_DELIVERY'} onChange={() => setPaymentMethod('CASH_ON_DELIVERY')} style={{ marginRight: '0.75rem' }} />

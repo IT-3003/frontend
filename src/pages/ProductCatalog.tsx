@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp, Product } from '../context/AppContext';
-import { Search, Star, ShoppingBag, ArrowLeft, Send } from 'lucide-react';
+import { Search, Star, ShoppingBag, ArrowLeft, Send, Trash2, Edit3, X, Check } from 'lucide-react';
 
 interface ProductCatalogProps {
   initialSearch?: string;
@@ -21,8 +21,11 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     addToCart, 
     reviews, 
     addReview, 
+    deleteReview,
+    updateReview,
     currentUser, 
-    showNotification 
+    showNotification,
+    setShowLoginModal
   } = useApp();
 
   const [search, setSearch] = useState(initialSearch);
@@ -74,6 +77,29 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     addReview(itemId, newRating, newComment);
     setNewComment('');
     setNewRating(5);
+  };
+
+  const handleDeleteReview = (reviewId: string) => {
+    if (window.confirm('Are you sure you want to delete your review?')) {
+      deleteReview(reviewId);
+    }
+  };
+
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [editingRating, setEditingRating] = useState<number>(5);
+  const [editingComment, setEditingComment] = useState<string>('');
+
+  const handleUpdateReview = async (reviewId: string) => {
+    if (!editingComment.trim()) {
+      showNotification('Review comment cannot be empty', 'error');
+      return;
+    }
+    try {
+      await updateReview(reviewId, { rating: editingRating, comment: editingComment });
+      setEditingReviewId(null);
+    } catch (err) {
+      showNotification('Failed to update review', 'error');
+    }
   };
 
   const activeProduct = detailProduct;
@@ -154,7 +180,13 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                     </div>
                     <button 
                       className="btn btn-primary btn-icon" 
-                      onClick={() => addToCart(prod)}
+                      onClick={() => {
+                        if (!currentUser) {
+                          setShowLoginModal(true);
+                        } else {
+                          addToCart(prod);
+                        }
+                      }}
                       disabled={!!(selectedBranch && stock <= 0)}
                       style={{ 
                         borderRadius: '8px',
@@ -252,7 +284,13 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
 
                 <button 
                   className="btn btn-primary" 
-                  onClick={() => addToCart(activeProduct, quantity)}
+                  onClick={() => {
+                    if (!currentUser) {
+                      setShowLoginModal(true);
+                    } else {
+                      addToCart(activeProduct, quantity);
+                    }
+                  }}
                   disabled={!!(selectedBranch && (activeProduct.branchStock[selectedBranch.branchId] || 0) <= 0)}
                   style={{ width: '100%', padding: '0.8rem', gap: '0.5rem' }}
                 >
@@ -312,7 +350,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                 </form>
               ) : (
                 <div className="glass-panel" style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Please login to share your rating and review feedback.
+                  Please <button onClick={() => setShowLoginModal(true)} style={{ background: 'none', border: 'none', padding: 0, margin: 0, color: 'var(--color-accent)', textDecoration: 'underline', cursor: 'pointer', fontWeight: 'bold', display: 'inline' }}>Sign In</button> to share your rating and review feedback.
                 </div>
               )}
 
@@ -321,19 +359,94 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                 {reviews.filter(r => r.itemId === activeProduct.itemId && !r.isFlagged).length > 0 ? (
                   reviews
                     .filter(r => r.itemId === activeProduct.itemId && !r.isFlagged)
-                    .map(rev => (
-                      <div key={rev.reviewId} className="glass-card" style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{rev.userName}</span>
-                          <div style={{ display: 'flex', gap: '0.1rem' }}>
-                            {[1, 2, 3, 4, 5].map(s => (
-                              <Star key={s} size={12} fill={s <= rev.rating ? 'var(--color-accent)' : 'none'} color={s <= rev.rating ? 'var(--color-accent)' : 'transparent'} />
-                            ))}
+                    .map(rev => {
+                      const isEditing = editingReviewId === rev.reviewId;
+                      return (
+                        <div key={rev.reviewId} className="glass-card" style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{rev.userName}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              {!isEditing ? (
+                                <>
+                                  <div style={{ display: 'flex', gap: '0.1rem' }}>
+                                    {[1, 2, 3, 4, 5].map(s => (
+                                      <Star key={s} size={12} fill={s <= rev.rating ? 'var(--color-accent)' : 'none'} color={s <= rev.rating ? 'var(--color-accent)' : 'transparent'} />
+                                    ))}
+                                  </div>
+                                  {currentUser && currentUser.userId === rev.userId && (
+                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                      <button 
+                                        onClick={() => {
+                                          setEditingReviewId(rev.reviewId);
+                                          setEditingRating(rev.rating);
+                                          setEditingComment(rev.comment);
+                                        }}
+                                        className="btn btn-secondary btn-icon"
+                                        style={{ padding: '0.2rem', minWidth: 'auto', minHeight: 'auto', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                                        title="Edit your review"
+                                      >
+                                        <Edit3 size={12} style={{ color: 'var(--text-muted)' }} />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteReview(rev.reviewId)}
+                                        className="btn btn-secondary btn-icon"
+                                        style={{ padding: '0.2rem', minWidth: 'auto', minHeight: 'auto', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                                        title="Delete your review"
+                                      >
+                                        <Trash2 size={12} style={{ color: 'var(--error)' }} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                  {[1, 2, 3, 4, 5].map(s => (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => setEditingRating(s)}
+                                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                                    >
+                                      <Star size={12} fill={s <= editingRating ? 'var(--color-accent)' : 'none'} color={s <= editingRating ? 'var(--color-accent)' : 'var(--text-muted)'} />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
+
+                          {isEditing ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                              <textarea
+                                value={editingComment}
+                                onChange={e => setEditingComment(e.target.value)}
+                                className="form-input"
+                                rows={2}
+                                style={{ width: '100%', fontSize: '0.85rem', padding: '0.4rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', outline: 'none' }}
+                              />
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                <button
+                                  onClick={() => setEditingReviewId(null)}
+                                  className="btn btn-secondary"
+                                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', gap: '0.25rem', display: 'flex', alignItems: 'center' }}
+                                >
+                                  <X size={12} /> Cancel
+                                </button>
+                                <button
+                                  onClick={() => handleUpdateReview(rev.reviewId)}
+                                  className="btn btn-primary"
+                                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', gap: '0.25rem', display: 'flex', alignItems: 'center' }}
+                                >
+                                  <Check size={12} /> Save
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{rev.comment}</p>
+                          )}
                         </div>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{rev.comment}</p>
-                      </div>
-                    ))
+                      );
+                    })
                 ) : (
                   <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                     Be the first to review this product!

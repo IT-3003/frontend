@@ -174,6 +174,10 @@ interface AppContextType {
   getBranchById: (id: string) => Promise<Branch>;
   getItemById: (id: string) => Promise<Product>;
   getReviewById: (id: string) => Promise<Review>;
+
+  // Login Modal state for guests
+  showLoginModal: boolean;
+  setShowLoginModal: (show: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -472,6 +476,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [activeCoupon, setActiveCoupon] = useState<Promotion | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
 
   // Sync state to local storage
   useEffect(() => { localStorage.setItem('fc_users', JSON.stringify(users)); }, [users]);
@@ -617,7 +622,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             orderId: `ord_${bp.order ? bp.order.orderId : (bp.orderId || '')}`,
             amount: bp.amount,
             paymentMethod: bp.paymentMethod || 'CASH_ON_DELIVERY',
-            status: bp.paymentStatus === 'SUCCESS' ? 'COMPLETED' : (bp.paymentStatus === 'FAILED' ? 'FAILED' : 'PENDING'),
+            status: (bp.paymentStatus === 'SUCCESS' ? 'COMPLETED' : (bp.paymentStatus === 'FAILED' ? 'FAILED' : 'PENDING')) as Payment['status'],
             createdAt: bp.paymentDate || new Date().toISOString()
           }));
           setPayments(mappedPayments);
@@ -1636,7 +1641,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getUserById,
         getBranchById,
         getItemById,
-        getReviewById
+        getReviewById,
+        showLoginModal,
+        setShowLoginModal
       }}
     >
       {children}

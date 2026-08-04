@@ -3,6 +3,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://it3003-springboot-backend.azurewebsites.net/api/:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ]
 }

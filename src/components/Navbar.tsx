@@ -19,19 +19,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
     users,
     cart,
     showNotification,
-    registerUser
+    setShowLoginModal
   } = useApp();
 
   const [showRoleSelect, setShowRoleSelect] = useState(false);
   const [showBranchSelect, setShowBranchSelect] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  
-  // Login modal fields
-  const [email, setEmail] = useState('');
-  const [isRegister, setIsRegister] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
 
   // Dark/Light Mode state
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -47,50 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isRegister) {
-      if (!email || !firstName || !lastName) {
-        showNotification('Please fill in required fields', 'error');
-        return;
-      }
-      const existing = users.find(u => u.email === email);
-      if (existing) {
-        showNotification('User already exists. Logging in instead.', 'info');
-        setCurrentUser(existing);
-        setCurrentRole(existing.role);
-      } else {
-        registerUser({
-          email,
-          firstName,
-          lastName,
-          phone,
-          role: 'CUSTOMER' as const
-        });
-      }
-      showNotification('Signed up successfully!', 'success');
-      setIsRegister(false);
-    } else {
-      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if (user) {
-        if (user.status === 'INACTIVE') {
-          showNotification('This account is deactivated', 'error');
-          return;
-        }
-        setCurrentUser(user);
-        setCurrentRole(user.role);
-        showNotification(`Welcome back, ${user.firstName}!`, 'success');
-      } else {
-        showNotification('User not found. Try john.doe@gmail.com', 'error');
-        return;
-      }
-    }
-    setShowLoginModal(false);
-    setEmail('');
-    setFirstName('');
-    setLastName('');
-    setPhone('');
-  };
+  // Removed local login handler - using App.tsx global login portal modal instead
 
   const handleRoleChange = (role: 'CUSTOMER' | 'EMPLOYEE' | 'ADMIN') => {
     setCurrentRole(role);
@@ -117,7 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
       <header className="glass-panel app-header">
         {/* Brand Logo */}
         <div onClick={() => onNavigate(currentRole === 'CUSTOMER' ? 'home' : 'admin-dashboard')} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
-          <span style={{ fontSize: '2rem' }}>🛒</span>
+          <ShoppingCart size={28} style={{ color: 'var(--color-accent)' }} />
           <div>
             <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
               FreshCart <Sparkles size={16} />
@@ -273,9 +222,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
               </button>
             </div>
           ) : (
-            <button className="btn btn-secondary" onClick={() => { setIsRegister(false); setShowLoginModal(true); }} style={{ gap: '0.5rem' }}>
+            <button className="btn btn-secondary" onClick={() => setShowLoginModal(true)} style={{ gap: '0.5rem' }}>
               <UserIcon size={16} />
-              <span>Login</span>
+              <span>Sign In</span>
             </button>
           )}
         </div>
@@ -408,9 +357,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
                   </button>
                 </div>
               ) : (
-                <button className="btn btn-secondary" onClick={() => { setIsRegister(false); setShowLoginModal(true); setShowMobileDrawer(false); }} style={{ width: '100%', gap: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <button className="btn btn-secondary" onClick={() => { setShowLoginModal(true); setShowMobileDrawer(false); }} style={{ width: '100%', gap: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <UserIcon size={16} />
-                  <span>Login / Register</span>
+                  <span>Sign In</span>
                 </button>
               )}
             </div>
@@ -418,100 +367,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
         </>
       )}
 
-      {/* LOGIN / SIGNUP MODAL */}
-      {showLoginModal && (
-        <div className="modal-backdrop" onClick={() => setShowLoginModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)' }}>
-              {isRegister ? 'Create FreshCart Account' : 'Sign In to FreshCart'}
-            </h3>
-            <form onSubmit={handleLogin}>
-              <div className="form-group">
-                <label className="form-label">Email Address *</label>
-                <input 
-                  type="email" 
-                  className="form-input" 
-                  required 
-                  placeholder="e.g. john.doe@gmail.com" 
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                />
-              </div>
-
-              {isRegister && (
-                <>
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label">First Name *</label>
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        required 
-                        placeholder="John" 
-                        value={firstName}
-                        onChange={e => setFirstName(e.target.value)}
-                      />
-                    </div>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label">Last Name *</label>
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        required 
-                        placeholder="Doe" 
-                        value={lastName}
-                        onChange={e => setLastName(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Phone Number</label>
-                    <input 
-                      type="tel" 
-                      className="form-input" 
-                      placeholder="+1234567890" 
-                      value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="form-group">
-                <label className="form-label">Password *</label>
-                <input 
-                  type="password" 
-                  className="form-input" 
-                  required 
-                  placeholder="••••••••" 
-                />
-                {!isRegister && (
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
-                    Try logging in with: <strong>john.doe@gmail.com</strong>
-                  </span>
-                )}
-              </div>
-
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
-                {isRegister ? 'Sign Up' : 'Login'}
-              </button>
-
-              <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>
-                  {isRegister ? 'Already have an account? ' : "Don't have an account? "}
-                </span>
-                <button 
-                  type="button" 
-                  onClick={() => setIsRegister(!isRegister)} 
-                  style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline' }}
-                >
-                  {isRegister ? 'Login' : 'Sign Up'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </>
   );
 };

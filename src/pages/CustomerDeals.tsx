@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useApp, Promotion } from '../context/AppContext';
-import { Ticket, Sparkles, Copy, Check, ShoppingBag, Info, Store } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { Ticket, Sparkles, Copy, Check, ShoppingBag, Store } from 'lucide-react';
 
 interface CustomerDealsProps {
   onNavigate: (page: string) => void;
@@ -16,8 +16,11 @@ export const CustomerDeals: React.FC<CustomerDealsProps> = ({ onNavigate }) => {
     if (!p.isActive) return false;
     
     // Filter by branch: either global (null) or matches selected branch
-    if (p.targetBranchId && p.targetBranchId !== selectedBranch?.branchId && p.targetBranchId !== selectedBranch?.branchId.replace('br_', '')) {
-      return false;
+    if (p.targetBranchId) {
+      const branchId = selectedBranch?.branchId;
+      if (!branchId || (p.targetBranchId !== branchId && p.targetBranchId !== branchId.replace('br_', ''))) {
+        return false;
+      }
     }
 
     if (filterType === 'coupon') return p.type === 'COUPON';

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp, Product } from '../context/AppContext';
-import { Search, ChevronLeft, ChevronRight, Star, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Star, ShoppingBag, ArrowRight, Minus, Plus } from 'lucide-react';
 
 interface CustomerHomeProps {
   onNavigate: (page: string) => void;
@@ -8,9 +8,24 @@ interface CustomerHomeProps {
 }
 
 export const CustomerHome: React.FC<CustomerHomeProps> = ({ onNavigate, onSelectProduct }) => {
-  const { promotions, products, selectedBranch, addToCart, reviews } = useApp();
+  const { promotions, products, selectedBranch, addToCart, reviews, currentUser, setShowLoginModal } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+
+  const getQty = (itemId: string) => quantities[itemId] || 1;
+  const setQty = (itemId: string, val: number) => {
+    setQuantities(prev => ({ ...prev, [itemId]: val }));
+  };
+
+  const handleAddToCart = (prod: Product) => {
+    if (!currentUser) {
+      setShowLoginModal(true);
+      return;
+    }
+    const qty = getQty(prod.itemId);
+    addToCart(prod, qty);
+  };
 
   const activeBanners = promotions.filter(p => p.isActive && p.type === 'BANNER' && (!p.targetBranchId || p.targetBranchId === selectedBranch?.branchId));
 
@@ -182,29 +197,73 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({ onNavigate, onSelect
                     )}
                   </div>
 
-                  <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem' }}>
-                    <div>
-                      <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--color-accent)' }}>${prod.price.toFixed(2)}</span>
-                      {selectedBranch && (
-                        <div style={{ fontSize: '0.7rem', color: stock > 0 ? 'var(--success)' : 'var(--error)' }}>
-                          {stock > 0 ? `${stock} in stock` : 'Out of stock'}
-                        </div>
-                      )}
+                  <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--color-accent)' }}>${prod.price.toFixed(2)}</span>
+                        {selectedBranch && (
+                          <div style={{ fontSize: '0.7rem', color: stock > 0 ? 'var(--success)' : 'var(--error)' }}>
+                            {stock > 0 ? `${stock} in stock` : 'Out of stock'}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <button 
-                      className="btn btn-primary btn-icon" 
-                      onClick={() => addToCart(prod)}
-                      disabled={!!(selectedBranch && stock <= 0)}
-                      style={{ 
-                        borderRadius: '8px', 
-                        padding: '0.5rem',
-                        opacity: selectedBranch && stock <= 0 ? 0.5 : 1,
-                        cursor: selectedBranch && stock <= 0 ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      <ShoppingBag size={18} />
-                    </button>
+                    {/* Quantity Selector and Add Button */}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
+                      {(!selectedBranch || stock > 0) && (
+                        <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'rgba(255,255,255,0.02)' }}>
+                          <button 
+                            onClick={() => setQty(prod.itemId, Math.max(1, getQty(prod.itemId) - 1))}
+                            className="btn btn-secondary btn-icon"
+                            style={{ padding: '0.3rem 0.5rem', border: 'none', background: 'transparent', minWidth: 'auto', minHeight: 'auto', cursor: 'pointer' }}
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <input 
+                            type="number" 
+                            value={getQty(prod.itemId)}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 1;
+                              const maxStock = selectedBranch ? stock : 99;
+                              setQty(prod.itemId, Math.min(maxStock, Math.max(1, val)));
+                            }}
+                            style={{ width: '30px', textAlign: 'center', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none' }}
+                          />
+                          <button 
+                            onClick={() => {
+                              const maxStock = selectedBranch ? stock : 99;
+                              setQty(prod.itemId, Math.min(maxStock, getQty(prod.itemId) + 1));
+                            }}
+                            className="btn btn-secondary btn-icon"
+                            style={{ padding: '0.3rem 0.5rem', border: 'none', background: 'transparent', minWidth: 'auto', minHeight: 'auto', cursor: 'pointer' }}
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                      )}
+
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={() => handleAddToCart(prod)}
+                        disabled={!!(selectedBranch && stock <= 0)}
+                        style={{ 
+                          borderRadius: '8px', 
+                          padding: '0.5rem 0.75rem',
+                          flexGrow: 1,
+                          fontSize: '0.85rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.4rem',
+                          opacity: selectedBranch && stock <= 0 ? 0.5 : 1,
+                          cursor: selectedBranch && stock <= 0 ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <ShoppingBag size={14} />
+                        <span>Add</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
