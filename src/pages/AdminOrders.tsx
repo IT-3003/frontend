@@ -1,16 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp, Order } from '../context/AppContext';
-import { ClipboardList, ArrowRight, XCircle, DollarSign, Calendar, MapPin, ShieldCheck } from 'lucide-react';
+import { ClipboardList, ArrowRight, XCircle, DollarSign, Calendar, MapPin, ShieldCheck, Edit, Save } from 'lucide-react';
 
 export const AdminOrders: React.FC = () => {
   const {
     orders,
     payments,
     updateOrderStatus,
+    updateOrder,
     cancelOrder,
     refundPayment,
     showNotification
   } = useApp();
+
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [editTotal, setEditTotal] = useState<string>('');
+  const [editSubtotal, setEditSubtotal] = useState<string>('');
+  const [editStatus, setEditStatus] = useState<Order['status']>('PROCESSING');
+  const [editCoupon, setEditCoupon] = useState<string>('');
 
   const handleStatusTransition = (order: Order) => {
     let nextStatus: Order['status'] = 'PROCESSING';
@@ -40,6 +47,35 @@ export const AdminOrders: React.FC = () => {
 
     if (window.confirm('Are you sure you want to refund this payment? This will void the payment transaction and cancel the order.')) {
       refundPayment(payment.transactionId);
+    }
+  };
+
+  const startEdit = (order: Order) => {
+    setEditingOrder(order);
+    setEditTotal(String(order.total));
+    setEditSubtotal(String(order.subtotal || order.total));
+    setEditStatus(order.status);
+    setEditCoupon(order.couponCode || '');
+  };
+
+  const saveEdit = async () => {
+    if (!editingOrder) return;
+    try {
+      const parsedTotal = parseFloat(editTotal);
+      const parsedSubtotal = parseFloat(editSubtotal);
+      if (isNaN(parsedTotal) || isNaN(parsedSubtotal)) {
+        showNotification('Please enter valid numeric amounts', 'error');
+        return;
+      }
+      await updateOrder(editingOrder.orderId, {
+        total: parsedTotal,
+        subtotal: parsedSubtotal,
+        status: editStatus,
+        couponCode: editCoupon
+      });
+      setEditingOrder(null);
+    } catch (err) {
+      // Error handles in context
     }
   };
 
@@ -132,6 +168,11 @@ export const AdminOrders: React.FC = () => {
 
                       <td style={{ padding: '1rem 0.75rem', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {/* Edit Action */}
+                          <button className="btn btn-secondary btn-icon" onClick={() => startEdit(order)} title="Edit Order Details">
+                            <Edit size={14} />
+                          </button>
+
                           {/* Fulfillment Actions */}
                           {order.status === 'PROCESSING' && (
                             <button className="btn btn-primary" onClick={() => handleStatusTransition(order)} style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', gap: '0.25rem' }}>
@@ -172,6 +213,80 @@ export const AdminOrders: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Edit Order Modal */}
+      {editingOrder && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div className="glass-panel" style={{ padding: '2rem', width: '90%', maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <h3>Edit Order: {editingOrder.orderId}</h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Fulfillment Status</label>
+              <select 
+                value={editStatus} 
+                onChange={(e) => setEditStatus(e.target.value as Order['status'])}
+                style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--card-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+              >
+                <option value="PROCESSING" style={{ color: '#000000' }}>PROCESSING</option>
+                <option value="READY_FOR_PICKUP" style={{ color: '#000000' }}>READY_FOR_PICKUP</option>
+                <option value="OUT_FOR_DELIVERY" style={{ color: '#000000' }}>OUT_FOR_DELIVERY</option>
+                <option value="DELIVERED" style={{ color: '#000000' }}>DELIVERED</option>
+                <option value="CANCELLED" style={{ color: '#000000' }}>CANCELLED</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Amount ($)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                value={editTotal} 
+                onChange={(e) => setEditTotal(e.target.value)}
+                style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--card-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Subtotal ($)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                value={editSubtotal} 
+                onChange={(e) => setEditSubtotal(e.target.value)}
+                style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--card-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Coupon Code</label>
+              <input 
+                type="text" 
+                value={editCoupon} 
+                onChange={(e) => setEditCoupon(e.target.value)}
+                style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--card-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button className="btn btn-secondary" onClick={() => setEditingOrder(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveEdit} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <Save size={14} /> Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

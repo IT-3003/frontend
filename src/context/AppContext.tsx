@@ -151,11 +151,13 @@ interface AppContextType {
   createPayment: (orderId: string, amount: number, method: Payment['paymentMethod']) => Promise<Payment>;
   updatePaymentStatus: (transactionId: string, status: Payment['status']) => Promise<void>;
   refundPayment: (transactionId: string) => Promise<void>;
+  deletePayment: (transactionId: string) => Promise<void>;
 
   // 5. Orders Management
   orders: Order[];
   placeOrder: (deliveryAddress: Address | null) => Promise<Order>;
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
+  updateOrder: (orderId: string, updates: Partial<Order>) => Promise<void>;
   cancelOrder: (orderId: string) => Promise<void>;
 
   // 6. Promotions Management
@@ -1086,7 +1088,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const createPayment = async (orderId: string, amount: number, method: Payment['paymentMethod']) => {
     const numericPaymentId = Math.floor(100000 + Math.random() * 900000);
-    
+
     let backendMethod = 'CASH';
     if (method === 'CREDIT_CARD') backendMethod = 'CREDIT_CARD';
     else if (method === 'DEBIT_CARD') backendMethod = 'DEBIT_CARD';
@@ -1094,7 +1096,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const backendPaymentPayload = {
       order: { orderId: toNumericId(orderId) },
-      user: { 
+      user: {
         id: currentUser ? toNumericId(currentUser.userId) : 1,
         type: currentUser ? (currentUser.role === 'ADMIN' ? 'admin' : (currentUser.role === 'EMPLOYEE' ? 'staff' : 'customer')) : 'customer'
       },
@@ -1201,6 +1203,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification('Payment refunded and order cancelled', 'info');
   };
 
+  const deletePayment = async (transactionId: string) => {
+    try {
+      const paymentObj = payments.find((p) => p.transactionId === transactionId);
+      if (!paymentObj) return;
+
+      // Extract numeric payment ID from custom string structure if necessary
+      const rawPaymentId = transactionId.startsWith('tx_') ? transactionId.substring(3) : transactionId;
+      const numericId = parseInt(rawPaymentId);
+
+      if (!isNaN(numericId)) {
+        await apiRequest(`/payments/${numericId}`, { method: 'DELETE' });
+      }
+      
+      setPayments((prev) => prev.filter((p) => p.transactionId !== transactionId));
+      showNotification('Payment record deleted successfully', 'info');
+    } catch (e) {
+      console.warn("Backend API delete payment failed, modifying local state only:", e);
+      setPayments((prev) => prev.filter((p) => p.transactionId !== transactionId));
+    }
+  };
+
   // --- 5. ORDERS MANAGEMENT ---
 
   const placeOrder = async (deliveryAddress: Address | null) => {
@@ -1216,7 +1239,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const assignedOrderId = Math.floor(100000 + Math.random() * 900000);
     const orderPayload = {
       orderId: assignedOrderId,
-      user: { 
+      user: {
         id: toNumericId(currentUser.userId),
         type: currentUser.role === 'ADMIN' ? 'admin' : (currentUser.role === 'EMPLOYEE' ? 'staff' : 'customer')
       },
@@ -1347,6 +1370,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((o) => (o.orderId === orderId ? { ...o, status } : o))
     );
     showNotification(`Order status updated to: ${status}`, 'info');
+  };
+
+  const updateOrder = async (orderId: string, updates: Partial<Order>) => {
+    try {
+      const numericId = toNumericId(orderId);
+      
+      // Get the existing order to preserve its full backend structure
+      const existing = orders.find(o => o.orderId === orderId);
+      if (!existing) throw new Error("Order not found locally");
+
+      // Construct a payload matching what the backend expects (refer to saveRuchitha/Order entity structure)
+      const backendPayload = {
+        orderId: numericId,
+        subtotal: updates.subtotal !== undefined ? updates.subtotal : existing.subtotal,
+        totalAmount: updates.total !== undefined ? updates.total : existing.total,
+        status: updates.status !== undefined ? updates.status : existing.status,
+        couponCode: updates.couponCode !== undefined ? updates.couponCode : existing.couponCode,
+        deliveryAddress: existing.deliveryAddress ? existing.deliveryAddress.street : 'In-Store Pickup',
+        orderDate: existing.createdAt || new Date().toISOString(),
+        // Map other properties if needed, or backend can preserve them from existing
+        user: { 
+          id: toNumericId(existing.userId),
+          type: existing.userId === 'usr_admin' ? 'admin' : 'customer' // Fallback check or map using a dynamic user check
+        },
+        branch: { branchId: toNumericId(existing.branchId) },
+        orderItems: existing.items.map(item => ({
+          product: { itemId: toNumericId(item.itemId) },
+          productName: item.name,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          lineTotal: Number((item.price * item.quantity).toFixed(2))
+        }))
+      };
+
+      const response = await apiRequest(`/order/${numericId}`, {
+        method: 'PUT',
+        body: JSON.stringify(backendPayload)
+      });
+
+      // Map backend response back to frontend Order schema
+      const mappedUpdatedOrder: Order = {
+        ...existing,
+        status: response.status || existing.status,
+        subtotal: response.subtotal || existing.subtotal,
+        total: response.totalAmount || existing.total,
+        couponCode: response.couponCode || existing.couponCode
+      };
+
+      setOrders((prev) =>
+        prev.map((o) => (o.orderId === orderId ? mappedUpdatedOrder : o))
+      );
+      showNotification('Order updated successfully', 'success');
+    } catch (e: any) {
+      console.error("Backend API update order failed:", e);
+      const errorMsg = e.message || 'Failed to update order';
+      showNotification(errorMsg.substring(0, 100), 'error');
+      throw e;
+    }
   };
 
   const cancelOrder = async (orderId: string) => {
@@ -1664,9 +1745,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createPayment,
         updatePaymentStatus,
         refundPayment,
+        deletePayment,
         orders,
         placeOrder,
         updateOrderStatus,
+        updateOrder,
         cancelOrder,
         promotions,
         addPromotion,

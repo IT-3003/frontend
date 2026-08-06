@@ -8,6 +8,8 @@ export const AdminDashboard: React.FC = () => {
     orders,
     branches,
     products,
+    payments,
+    deletePayment,
     registerUser,
     updateUser,
     deactivateUser,
@@ -112,11 +114,11 @@ export const AdminDashboard: React.FC = () => {
 
       </div>
 
-      {/* User Management Section */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
+      {/* User & Payment Management Sections */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
         {/* User Accounts List */}
-        <div className="glass-panel" style={{ flex: '2 1 600px', padding: '1.5rem' }}>
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
             <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Users size={20} /> User Accounts Directory</h3>
             <button className="btn btn-primary" onClick={() => setShowAddEmployee(true)}>
@@ -166,6 +168,66 @@ export const AdminDashboard: React.FC = () => {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Payments Transaction History */}
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><DollarSign size={20} /> Transaction History Ledger</h3>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '0.75rem' }}>Transaction ID</th>
+                  <th style={{ padding: '0.75rem' }}>Order ID</th>
+                  <th style={{ padding: '0.75rem' }}>Method</th>
+                  <th style={{ padding: '0.75rem' }}>Amount</th>
+                  <th style={{ padding: '0.75rem' }}>Status</th>
+                  <th style={{ padding: '0.75rem' }}>Date</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map(payment => (
+                  <tr key={payment.transactionId} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <td style={{ padding: '0.75rem', fontWeight: 'bold' }}>{payment.transactionId}</td>
+                    <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{payment.orderId}</td>
+                    <td style={{ padding: '0.75rem' }}>
+                      <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>
+                        {payment.paymentMethod.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.75rem', fontWeight: 'bold', color: 'var(--color-accent)' }}>${payment.amount.toFixed(2)}</td>
+                    <td style={{ padding: '0.75rem' }}>
+                      <span className={`badge ${
+                        payment.status === 'COMPLETED' ? 'badge-success' : 
+                        payment.status === 'REFUNDED' ? 'badge-info' : 'badge-danger'
+                      }`}>
+                        {payment.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {new Date(payment.createdAt).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                      <button className="btn btn-secondary" onClick={() => deletePayment(payment.transactionId)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--error)' }}>
+                        Delete Record
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {payments.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                      No payment transactions recorded.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
