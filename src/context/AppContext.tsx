@@ -1400,7 +1400,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const firstProduct = products.length > 0 ? products[0] : null;
     const itemNumId = firstProduct ? toNumericId(firstProduct.itemId) : 1;
     const backendPromoPayload = {
-      promotionId: numericPromoId,
       promotionName: data.code,
       description: data.description,
       discountValue: data.discountPercent,
