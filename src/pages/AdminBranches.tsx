@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp, Branch } from '../context/AppContext';
-import { Store, Plus, Edit3, Trash2, Clock, MapPin, UserCheck } from 'lucide-react';
+import { Store, Plus, Edit3, Trash2, Clock, MapPin, UserCheck, Phone } from 'lucide-react';
 
 export const AdminBranches: React.FC = () => {
   const { branches, addBranch, updateBranch, deleteBranch, users } = useApp();
@@ -11,6 +11,7 @@ export const AdminBranches: React.FC = () => {
   // Form Fields
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [managerId, setManagerId] = useState('');
   const [openingHours, setOpeningHours] = useState('');
 
@@ -20,6 +21,7 @@ export const AdminBranches: React.FC = () => {
     setEditingBranch(null);
     setName('');
     setAddress('');
+    setPhoneNumber('0771234567');
     setManagerId(staffUsers[0]?.userId || '');
     setOpeningHours('08:00 AM - 10:00 PM');
     setShowFormModal(true);
@@ -29,6 +31,7 @@ export const AdminBranches: React.FC = () => {
     setEditingBranch(branch);
     setName(branch.name);
     setAddress(branch.address);
+    setPhoneNumber(branch.phoneNumber || '0771234567');
     setManagerId(branch.managerId);
     setOpeningHours(branch.openingHours);
     setShowFormModal(true);
@@ -42,6 +45,7 @@ export const AdminBranches: React.FC = () => {
       updateBranch(editingBranch.branchId, {
         name,
         address,
+        phoneNumber,
         managerId,
         managerName,
         openingHours
@@ -50,6 +54,7 @@ export const AdminBranches: React.FC = () => {
       addBranch({
         name,
         address,
+        phoneNumber,
         managerId,
         managerName,
         openingHours,
@@ -91,6 +96,10 @@ export const AdminBranches: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <MapPin size={16} />
                 <span>{branch.address}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Phone size={16} />
+                <span>{branch.phoneNumber || '0771234567'}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Clock size={16} />
@@ -138,6 +147,20 @@ export const AdminBranches: React.FC = () => {
               <div className="form-group">
                 <label className="form-label">Store Address *</label>
                 <input type="text" required className="form-input" placeholder="e.g. 100 Plaza Road, Springfield" value={address} onChange={e => setAddress(e.target.value)} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Phone Number *</label>
+                <input 
+                  type="text" 
+                  required 
+                  pattern="^0\d{9}$"
+                  title="Phone number must start with 0 and contain exactly 10 digits (e.g., 0771234567)"
+                  className="form-input" 
+                  placeholder="e.g. 0771234567" 
+                  value={phoneNumber} 
+                  onChange={e => setPhoneNumber(e.target.value)} 
+                />
               </div>
 
               <div className="form-group">

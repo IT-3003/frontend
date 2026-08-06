@@ -25,6 +25,7 @@ export interface Branch {
   branchId: string;
   name: string;
   address: string;
+  phoneNumber: string;
   managerId: string;
   managerName: string;
   openingHours: string;
@@ -252,6 +253,7 @@ export const DEFAULT_BRANCHES: Branch[] = [
     branchId: 'br_001',
     name: 'Springfield Mall (HQ)',
     address: '250 Mall Drive, Springfield',
+    phoneNumber: '0771234567',
     managerId: 'usr_emp1',
     managerName: 'Jane Smith',
     openingHours: '08:00 AM - 10:00 PM',
@@ -261,6 +263,7 @@ export const DEFAULT_BRANCHES: Branch[] = [
     branchId: 'br_002',
     name: 'Downtown Express',
     address: '789 Broad St, Metro City',
+    phoneNumber: '0777654321',
     managerId: 'usr_admin',
     managerName: 'Admin Supermarket',
     openingHours: '07:00 AM - 11:00 PM',
@@ -270,6 +273,7 @@ export const DEFAULT_BRANCHES: Branch[] = [
     branchId: 'br_003',
     name: 'Westside Supercentre',
     address: '44 Sunset Blvd, Springfield',
+    phoneNumber: '0771112223',
     managerId: 'usr_emp1',
     managerName: 'Jane Smith',
     openingHours: '08:00 AM - 09:00 PM',
@@ -894,7 +898,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       branchId: numericId,
       branchName: data.name,
       address: data.address,
-      phoneNumber: '',
+      phoneNumber: data.phoneNumber || '0771234567',
       managerId: toNumericId(data.managerId),
       openingHours: data.openingHours,
       createdDate: new Date().toISOString(),
@@ -910,6 +914,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         branchId: String(response.branchId),
         name: response.branchName,
         address: response.address,
+        phoneNumber: response.phoneNumber,
         managerId: String(response.managerId),
         managerName: data.managerName || '',
         openingHours: response.openingHours,
@@ -931,11 +936,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateBranch = async (branchId: string, updates: Partial<Branch>) => {
+    const existing = branches.find((b) => b.branchId === branchId);
+    if (!existing) return;
+
+    const merged = { ...existing, ...updates };
+
+    const backendBranchPayload = {
+      branchId: toNumericId(branchId),
+      branchName: merged.name,
+      address: merged.address,
+      phoneNumber: merged.phoneNumber || '0771234567',
+      managerId: toNumericId(merged.managerId),
+      openingHours: merged.openingHours,
+      updatedDate: new Date().toISOString(),
+      active: merged.isActive !== false
+    };
+
     try {
-      // Branch update is not supported in the backend controller, simulation only
       await apiRequest(`/branch/${toNumericId(branchId)}`, {
         method: 'PUT',
-        body: JSON.stringify(updates)
+        body: JSON.stringify(backendBranchPayload)
       });
     } catch (e) {
       console.warn("Backend API branch update failed, modifying local state only:", e);
@@ -1377,7 +1397,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addPromotion = async (data: Omit<Promotion, 'promoId'>) => {
     const numericPromoId = Math.floor(100000 + Math.random() * 900000);
-    const itemNumId = data.targetBranchId ? toNumericId(data.targetBranchId) : 1; // Backend requires an item, use targetBranchId or default to 1 (banana)
+    const firstProduct = products.length > 0 ? products[0] : null;
+    const itemNumId = firstProduct ? toNumericId(firstProduct.itemId) : 1;
     const backendPromoPayload = {
       promotionId: numericPromoId,
       promotionName: data.code,
@@ -1421,10 +1442,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updatePromotion = async (promoId: string, updates: Partial<Promotion>) => {
+    const existing = promotions.find((p) => p.promoId === promoId);
+    if (!existing) return;
+
+    const merged = { ...existing, ...updates };
+    const firstProduct = products.length > 0 ? products[0] : null;
+    const itemNumId = firstProduct ? toNumericId(firstProduct.itemId) : 1;
+
+    const backendPromoPayload = {
+      promotionId: toNumericId(promoId),
+      promotionName: merged.code,
+      description: merged.description,
+      discountValue: merged.discountPercent,
+      discountType: merged.type,
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: merged.expiryDate ? merged.expiryDate.split('T')[0] : new Date().toISOString().split('T')[0],
+      item: { itemId: itemNumId }
+    };
+
     try {
-      await apiRequest(`/promotion/${toNumericId(promoId)}`, {
+      await apiRequest(`/promotion/update/${toNumericId(promoId)}`, {
         method: 'PUT',
-        body: JSON.stringify(updates)
+        body: JSON.stringify(backendPromoPayload)
       });
     } catch (e) {
       console.warn("Backend API update promo failed, modifying local state only:", e);
