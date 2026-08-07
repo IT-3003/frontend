@@ -13,8 +13,16 @@ export const AdminDashboard: React.FC = () => {
     registerUser,
     updateUser,
     deactivateUser,
+    deleteUser,
+    updatePayment,
     showNotification
   } = useApp();
+
+  const handleDeleteUserClick = (userId: string, name: string) => {
+    if (window.confirm(`Are you sure you want to permanently delete ${name}? This will also delete all their associated orders and payment records.`)) {
+      deleteUser(userId);
+    }
+  };
 
   const [showAddEmployee, setShowAddEmployee] = useState(false);
   const [email, setEmail] = useState('');
@@ -22,6 +30,35 @@ export const AdminDashboard: React.FC = () => {
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'EMPLOYEE' | 'ADMIN'>('EMPLOYEE');
+
+  // Payment Edit states
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [editPaymentAmount, setEditPaymentAmount] = useState('');
+  const [editPaymentMethod, setEditPaymentMethod] = useState<Payment['paymentMethod']>('CREDIT_CARD');
+  const [editPaymentStatus, setEditPaymentStatus] = useState<Payment['status']>('PENDING');
+
+  const startEditPayment = (payment: Payment) => {
+    setEditingPayment(payment);
+    setEditPaymentAmount(String(payment.amount));
+    setEditPaymentMethod(payment.paymentMethod);
+    setEditPaymentStatus(payment.status);
+  };
+
+  const handleSavePaymentEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPayment) return;
+    const parsedAmount = parseFloat(editPaymentAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      showNotification('Please enter a valid amount greater than zero', 'error');
+      return;
+    }
+    await updatePayment(editingPayment.transactionId, {
+      amount: parsedAmount,
+      paymentMethod: editPaymentMethod,
+      status: editPaymentStatus
+    });
+    setEditingPayment(null);
+  };
 
   // Compute stats
   const totalRevenue = orders
@@ -156,15 +193,20 @@ export const AdminDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                      {user.status === 'ACTIVE' ? (
-                        <button className="btn btn-secondary" onClick={() => deactivateUser(user.userId)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--error)' }}>
-                          Deactivate
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        {user.status === 'ACTIVE' ? (
+                          <button className="btn btn-secondary" onClick={() => deactivateUser(user.userId)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--error)' }}>
+                            Deactivate
+                          </button>
+                        ) : (
+                          <button className="btn btn-secondary" onClick={() => updateUser(user.userId, { status: 'ACTIVE' })} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--success)' }}>
+                            Activate
+                          </button>
+                        )}
+                        <button className="btn btn-secondary" onClick={() => handleDeleteUserClick(user.userId, `${user.firstName} ${user.lastName}`)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--error)' }}>
+                          Delete
                         </button>
-                      ) : (
-                        <button className="btn btn-secondary" onClick={() => updateUser(user.userId, { status: 'ACTIVE' })} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--success)' }}>
-                          Activate
-                        </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -215,9 +257,14 @@ export const AdminDashboard: React.FC = () => {
                       {new Date(payment.createdAt).toLocaleDateString()}
                     </td>
                     <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                      <button className="btn btn-secondary" onClick={() => deletePayment(payment.transactionId)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--error)' }}>
-                        Delete Record
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <button className="btn btn-secondary" onClick={() => startEditPayment(payment)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--color-accent)' }}>
+                          Edit
+                        </button>
+                        <button className="btn btn-secondary" onClick={() => deletePayment(payment.transactionId)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--error)' }}>
+                          Delete Record
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -266,6 +313,50 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
                   Register Employee
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Payment Form Drawer / Section */}
+        {editingPayment && (
+          <div className="modal-backdrop" onClick={() => setEditingPayment(null)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+              <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)' }}>Edit Payment Transaction</h3>
+              <form onSubmit={handleSavePaymentEdit}>
+                <div className="form-group">
+                  <label className="form-label">Transaction ID</label>
+                  <input type="text" disabled className="form-input" value={editingPayment.transactionId} style={{ opacity: 0.7 }} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Order ID</label>
+                  <input type="text" disabled className="form-input" value={editingPayment.orderId} style={{ opacity: 0.7 }} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Amount ($) *</label>
+                  <input type="number" step="0.01" required className="form-input" value={editPaymentAmount} onChange={e => setEditPaymentAmount(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Payment Method *</label>
+                  <select className="form-input" value={editPaymentMethod} onChange={e => setEditPaymentMethod(e.target.value as any)}>
+                    <option value="CREDIT_CARD">Credit Card</option>
+                    <option value="DEBIT_CARD">Debit Card</option>
+                    <option value="CASH_ON_DELIVERY">Cash on Delivery</option>
+                    <option value="MOBILE_WALLET">Mobile Wallet</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Payment Status *</label>
+                  <select className="form-input" value={editPaymentStatus} onChange={e => setEditPaymentStatus(e.target.value as any)}>
+                    <option value="PENDING">Pending</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="FAILED">Failed</option>
+                    <option value="REFUNDED">Refunded</option>
+                  </select>
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
+                  Save Changes
                 </button>
               </form>
             </div>

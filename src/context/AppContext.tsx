@@ -51,6 +51,7 @@ export interface Payment {
   paymentMethod: 'CREDIT_CARD' | 'DEBIT_CARD' | 'CASH_ON_DELIVERY' | 'MOBILE_WALLET';
   status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
   createdAt: string;
+  paymentId?: number;
 }
 
 export interface OrderItem {
@@ -74,6 +75,7 @@ export interface Order {
   status: 'PROCESSING' | 'READY_FOR_PICKUP' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
   deliveryAddress: Address | null; // null means in-store pickup
   createdAt: string;
+  couponCode?: string;
 }
 
 export interface Promotion {
@@ -133,6 +135,7 @@ interface AppContextType {
   registerUser: (data: Omit<User, 'userId' | 'status' | 'addresses'> & { password?: string; address?: string }) => Promise<User>;
   updateUser: (userId: string, updates: Partial<User> & { password?: string }) => Promise<void>;
   deactivateUser: (userId: string) => Promise<void>;
+  deleteUser: (userId: string) => Promise<void>;
 
   // 2. Branch Management
   branches: Branch[];
@@ -152,6 +155,7 @@ interface AppContextType {
   updatePaymentStatus: (transactionId: string, status: Payment['status']) => Promise<void>;
   refundPayment: (transactionId: string) => Promise<void>;
   deletePayment: (transactionId: string) => Promise<void>;
+  updatePayment: (transactionId: string, updates: Partial<Payment>) => Promise<void>;
 
   // 5. Orders Management
   orders: Order[];
@@ -625,6 +629,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (Array.isArray(backendPayments)) {
           const mappedPayments = backendPayments.map((bp: any) => ({
             transactionId: bp.transaction || `tx_${bp.paymentId}`,
+            paymentId: bp.paymentId,
             orderId: `ord_${bp.order ? bp.order.orderId : (bp.orderId || '')}`,
             amount: bp.amount,
             paymentMethod: bp.paymentMethod || 'CASH_ON_DELIVERY',
@@ -892,6 +897,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification('Account has been deactivated', 'info');
   };
 
+  const deleteUser = async (userId: string) => {
+    try {
+      const numericId = toNumericId(userId);
+      await apiRequest(`/user/${numericId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn("Backend API account deletion failed, modifying local state only:", e);
+    }
+    setUsers((prev) => prev.filter((u) => u.userId !== userId));
+    if (currentUser?.userId === userId) {
+      setCurrentUser(null);
+      setCurrentRole('CUSTOMER');
+    }
+    showNotification('User account deleted successfully', 'info');
+  };
+
   // --- 2. BRANCH MANAGEMENT ---
 
   const addBranch = async (data: Omit<Branch, 'branchId'>) => {
@@ -1125,6 +1145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const mappedPayment: Payment = {
         transactionId: response.transaction || String(response.paymentId),
+        paymentId: response.paymentId,
         orderId: String(response.order ? response.order.orderId : response.orderId),
         amount: response.amount,
         paymentMethod: frontendMethod,
@@ -1137,6 +1158,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn("Backend API create payment failed, simulating locally:", e);
       const newPayment: Payment = {
         transactionId: 'tx_' + numericPaymentId,
+        paymentId: numericPaymentId,
         orderId,
         amount,
         paymentMethod: method,
@@ -1221,6 +1243,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn("Backend API delete payment failed, modifying local state only:", e);
       setPayments((prev) => prev.filter((p) => p.transactionId !== transactionId));
+    }
+  };
+
+  const updatePayment = async (transactionId: string, updates: Partial<Payment>) => {
+    try {
+      const existing = payments.find((p) => p.transactionId === transactionId);
+      if (!existing) throw new Error("Payment not found");
+
+      const localUpdates = { ...updates };
+      const numericId = existing.paymentId || toNumericId(transactionId);
+
+      // Map paymentMethod back to backend enum
+      let backendMethod = 'CASH';
+      const updatedMethod = updates.paymentMethod !== undefined ? updates.paymentMethod : existing.paymentMethod;
+      if (updatedMethod === 'CREDIT_CARD') backendMethod = 'CREDIT_CARD';
+      else if (updatedMethod === 'DEBIT_CARD') backendMethod = 'DEBIT_CARD';
+      else if (updatedMethod === 'MOBILE_WALLET') backendMethod = 'PAYPAL';
+
+      // Map status back to backend enum
+      let backendStatus = 'SUCCESS';
+      const updatedStatus = updates.status !== undefined ? updates.status : existing.status;
+      if (updatedStatus === 'COMPLETED') backendStatus = 'SUCCESS';
+      else if (updatedStatus === 'FAILED') backendStatus = 'FAILED';
+      else if (updatedStatus === 'PENDING') backendStatus = 'PENDING';
+      else if (updatedStatus === 'REFUNDED') backendStatus = 'REFUNDED';
+
+      const backendPaymentPayload = {
+        paymentId: numericId,
+        order: { orderId: toNumericId(existing.orderId) },
+        user: { id: currentUser ? toNumericId(currentUser.userId) : 1 },
+        amount: updates.amount !== undefined ? updates.amount : existing.amount,
+        paymentMethod: backendMethod,
+        transaction: transactionId,
+        paymentStatus: backendStatus,
+        paymentDate: existing.createdAt,
+        isActive: true
+      };
+
+      await apiRequest(`/payments/${numericId}`, {
+        method: 'PUT',
+        body: JSON.stringify(backendPaymentPayload)
+      });
+
+      setPayments((prev) =>
+        prev.map((p) => (p.transactionId === transactionId ? { ...p, ...localUpdates } : p))
+      );
+      showNotification('Payment record updated successfully', 'success');
+    } catch (e) {
+      console.warn("Backend API update payment failed, modifying local state only:", e);
+      setPayments((prev) =>
+        prev.map((p) => (p.transactionId === transactionId ? { ...p, ...updates } : p))
+      );
     }
   };
 
@@ -1673,6 +1747,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       branchId: String(response.branchId),
       name: response.branchName,
       address: response.address,
+      phoneNumber: response.phoneNumber || '',
       managerId: String(response.managerId),
       managerName: '',
       openingHours: response.openingHours,
@@ -1733,6 +1808,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         registerUser,
         updateUser,
         deactivateUser,
+        deleteUser,
         branches,
         addBranch,
         updateBranch,
@@ -1746,6 +1822,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updatePaymentStatus,
         refundPayment,
         deletePayment,
+        updatePayment,
         orders,
         placeOrder,
         updateOrderStatus,

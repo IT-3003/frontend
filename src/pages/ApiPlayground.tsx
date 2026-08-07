@@ -282,17 +282,19 @@ export const ApiPlayground: React.FC = () => {
   // 2. Branch Management Forms
   const [branchName, setBranchName] = useState('Metro Hub');
   const [branchAddress, setBranchAddress] = useState('500 Broadway St, New York');
+  const [branchPhoneNumber, setBranchPhoneNumber] = useState('0771234567');
   const [branchManagerId, setBranchManagerId] = useState('1');
   const [branchHours, setBranchHours] = useState('09:00 AM - 09:00 PM');
   const [deleteBranchId, setDeleteBranchId] = useState('');
 
   const handleAddBranch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const logId = addLog('POST', '/api/branch/create', { name: branchName, address: branchAddress, managerId: branchManagerId, openingHours: branchHours, managerName: '' });
+    const logId = addLog('POST', '/api/branch/create', { name: branchName, address: branchAddress, phoneNumber: branchPhoneNumber, managerId: branchManagerId, openingHours: branchHours, managerName: '' });
     try {
       const res = await addBranch({
         name: branchName,
         address: branchAddress,
+        phoneNumber: branchPhoneNumber,
         managerId: branchManagerId,
         managerName: '',
         openingHours: branchHours,
@@ -623,9 +625,13 @@ export const ApiPlayground: React.FC = () => {
                       <input type="text" className="form-input" value={branchManagerId} onChange={(e) => setBranchManagerId(e.target.value)} required />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Opening Hours</label>
-                      <input type="text" className="form-input" value={branchHours} onChange={(e) => setBranchHours(e.target.value)} required />
+                      <label className="form-label">Phone Number</label>
+                      <input type="text" className="form-input" value={branchPhoneNumber} onChange={(e) => setBranchPhoneNumber(e.target.value)} required />
                     </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Opening Hours</label>
+                    <input type="text" className="form-input" value={branchHours} onChange={(e) => setBranchHours(e.target.value)} required />
                   </div>
                   <button type="submit" className="btn btn-primary" style={{ gap: '0.5rem' }}>
                     <Send size={16} /> Create Store Branch
